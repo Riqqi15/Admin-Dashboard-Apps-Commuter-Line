@@ -1,0 +1,124 @@
+erDiagram
+    STATIONS {
+        uuid id PK
+        varchar code UK
+        varchar name
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ADMIN_USERS {
+        uuid id PK
+        varchar username UK
+        text password_hash
+        enum role
+        uuid station_id FK
+        boolean is_active
+        boolean must_change_password
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ADMIN_SESSIONS {
+        uuid id PK
+        uuid admin_user_id FK
+        char token_hash UK
+        char csrf_token_hash
+        timestamptz expires_at
+        timestamptz revoked_at
+        timestamptz last_seen_at
+        timestamptz created_at
+    }
+
+    TRACKED_USERS {
+        uuid id PK
+        varchar external_user_id UK
+        text display_name_ciphertext
+        text phone_ciphertext
+        timestamptz first_seen_at
+        timestamptz last_seen_at
+        timestamptz expires_at
+    }
+
+    CAMERA_SESSIONS {
+        uuid id PK
+        uuid external_session_id UK
+        uuid tracked_user_id FK
+        uuid station_id FK
+        enum source
+        enum status
+        timestamptz started_at
+        timestamptz ended_at
+        timestamptz created_at
+        timestamptz expires_at
+    }
+
+    CAMERA_EVENTS {
+        uuid id PK
+        uuid event_id UK
+        uuid camera_session_id FK
+        enum type
+        varchar error_code
+        timestamptz occurred_at
+        timestamptz received_at
+        timestamptz expires_at
+    }
+
+    ALERTS {
+        uuid id PK
+        uuid camera_session_id FK, UK
+        uuid station_id FK
+        uuid tracked_user_id FK
+        uuid assigned_to_id FK
+        text user_name_ciphertext
+        text user_phone_ciphertext
+        enum failure_type
+        varchar error_code
+        enum status
+        varchar resolution_note
+        timestamptz created_at
+        timestamptz acknowledged_at
+        timestamptz resolved_at
+        timestamptz pii_purged_at
+        timestamptz expires_at
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid actor_admin_user_id FK
+        uuid station_id FK
+        varchar action
+        varchar entity_type
+        uuid entity_id
+        jsonb details
+        timestamptz created_at
+        timestamptz expires_at
+    }
+
+    DAILY_USAGE_STATS {
+        uuid id PK
+        uuid station_id FK
+        date stat_date
+        int session_count
+        int unique_user_count
+        int failed_session_count
+        int alert_count
+        int resolved_alert_count
+        int average_response_seconds
+    }
+
+    STATIONS ||--o{ ADMIN_USERS : "assigns security staff"
+    ADMIN_USERS ||--o{ ADMIN_SESSIONS : "owns"
+    STATIONS ||--o{ CAMERA_SESSIONS : "scopes"
+    TRACKED_USERS ||--o{ CAMERA_SESSIONS : "starts"
+    CAMERA_SESSIONS ||--o{ CAMERA_EVENTS : "contains"
+    CAMERA_SESSIONS ||--o| ALERTS : "triggers"
+    STATIONS ||--o{ ALERTS : "receives"
+    TRACKED_USERS o|--o{ ALERTS : "reported for"
+    ADMIN_USERS o|--o{ ALERTS : "handles"
+    ADMIN_USERS o|--o{ AUDIT_LOGS : "performs"
+    STATIONS o|--o{ AUDIT_LOGS : "scopes"
+    STATIONS ||--o{ DAILY_USAGE_STATS : "aggregates"
+
