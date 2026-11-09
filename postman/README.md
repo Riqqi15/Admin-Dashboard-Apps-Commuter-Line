@@ -1,10 +1,10 @@
 # Pengujian API dengan Postman
 
-Status: **Health Check tersedia; endpoint bisnis masih draft**. Server lokal sudah memiliki `/health` dan `/health/live`. Folder Health Check dijalankan lewat Newman ke backend nyata; 26 request bisnis lainnya menunggu implementasi database/auth/alert. File ini mengikuti [API specification](../docs/api-specification.md).
+Status: **Health Check dan Database Readiness tersedia; endpoint bisnis masih draft**. Server lokal memiliki `/health`, `/health/live`, dan `/health/ready`. Newman menjalankan dua request ke backend nyata; 26 request bisnis menunggu implementasi auth/alert. Database, migration dan seed demo sudah tersedia. File ini mengikuti [API specification](../docs/api-specification.md).
 
 ## File
 
-- `Timetable-Admin.postman_collection.json`: 27 request dalam 10 folder.
+- `Timetable-Admin.postman_collection.json`: 28 request dalam 11 folder (termasuk readiness).
 - `Local.postman_environment.json`: contoh Environment tanpa kredensial.
 - `validate.cjs`: pemeriksaan struktur, variabel, dan sintaks script secara offline.
 
@@ -12,18 +12,18 @@ Status: **Health Check tersedia; endpoint bisnis masih draft**. Server lokal sud
 
 1. Buka Postman desktop, klik **Import**, lalu pilih kedua file JSON di folder ini.
 2. Pilih Environment **Timetable Admin — Local Example**.
-3. Dari root repository jalankan `npm run setup:local` lalu `npm run dev`. Isi `baseUrl` dengan `http://127.0.0.1:3000` (tanpa slash terakhir).
+3. Ikuti setup di README utama: generate Prisma Client, jalankan database/migration, lalu `npm run dev`. Isi `baseUrl` dengan `http://127.0.0.1:3000` (tanpa slash terakhir).
 4. Buka folder **01 Health Check**, pilih **01 Backend hidup**, lalu klik **Send**.
 5. Target: HTTP `200`, JSON `{"success":true,"data":{"status":"ok"}}`, dan empat assertion lulus pada **Test Results**. Jika koneksi ditolak, pastikan backend sudah aktif dan port benar.
 
-Alternatif otomatis: jalankan `npm run postman:health` di terminal lain. Perintah ini hanya menjalankan folder Health Check dari Collection yang sama. Hindari Run seluruh Collection sampai endpoint bisnis tersedia.
+Alternatif otomatis: jalankan `npm run postman:health` di terminal lain. Perintah ini menjalankan Health Check dan Database Readiness: 2 request, 7 assertion. Readiness memerlukan PostgreSQL aktif; liveness tidak. Hindari Run seluruh Collection sampai endpoint bisnis tersedia.
 
 Cara impor: [dokumentasi resmi Postman](https://learning.postman.com/docs/getting-started/importing-and-exporting/importing-data/).
 Cara kerja assertion: [dokumentasi script Postman](https://learning.postman.com/docs/tests-and-scripts/write-scripts/test-scripts/).
 
 ## Persiapan alur lengkap (sesudah backend selesai)
 
-Gunakan database demo dengan dua stasiun dan tiga akun hasil seed backend: Super Admin, petugas stasiun A, dan petugas stasiun B. Seed belum tersedia; Collection ini tidak membuat akun/stasiun karena schema create belum final.
+Jalankan `npm run setup:demo` lalu `npm run prisma:seed`: dua stasiun demo, akun `superadmin`, `security.manggarai`, dan `security.tanahabang` dibuat. Sandi acak berada di `.env.seed.local`; akun baru wajib mengganti sandi ketika implementasi auth tersedia. Collection bisnis masih draft dan tidak membuat akun/stasiun.
 
 Isi Environment secara lokal:
 

@@ -4,15 +4,15 @@ const newman = require('newman');
 
 const collection = JSON.parse(readFileSync(resolve(__dirname, '../postman/Timetable-Admin.postman_collection.json'), 'utf8'));
 // Run the real health request from the existing collection; business routes are not implemented yet.
-const health = collection.item.find(folder => folder.name === '01 Health Check');
-if (!health) throw new Error('Health Check folder is missing');
+const health = collection.item.filter(folder => ['01 Health Check', '01b Database Readiness'].includes(folder.name));
+if (health.length !== 2) throw new Error('Health / readiness folders are missing');
 newman.run({
-  collection: { ...collection, item: [health] },
+  collection: { ...collection, item: health },
   environment: resolve(__dirname, '../postman/Local.postman_environment.json'),
   envVar: [{ key: 'baseUrl', value: process.env.API_BASE_URL || 'http://127.0.0.1:3000' }],
   reporters: ['cli'],
   timeoutRequest: 5000,
   bail: true,
 }, (error, summary) => {
-  if (error || !summary || summary.run.failures.length || summary.run.stats.requests.total !== 1) process.exitCode = 1;
+  if (error || !summary || summary.run.failures.length || summary.run.stats.requests.total !== 2) process.exitCode = 1;
 });

@@ -13,6 +13,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "prisma/seed.ts", "prisma.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

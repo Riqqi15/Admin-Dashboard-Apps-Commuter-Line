@@ -16,6 +16,7 @@ Diagram ini menggambarkan database backend Admin Dashboard Timetable.
 - Super Admin tidak memiliki 'station_id'.
 - Satu stasiun dapat mempunyai beberapa petugas, sesi kamera, alert, dan statistik harian.
 - Satu sesi kamera mempunyai banyak event dan maksimal satu alert.
+- Setelah retensi sesi 7 hari, FK sesi pada alert dapat kosong. `source_session_id` unik tetap menyimpan referensi asal, dan alert bertahan sampai retensi 30 hari.
 - Foto atau video kamera tidak disimpan.
 - PII pengguna disimpan terenkripsi dan mengikuti retensi tujuh hari.
 

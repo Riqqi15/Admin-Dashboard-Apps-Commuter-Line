@@ -11,4 +11,6 @@ Thumbs.db
 .vscode/
 postman/local/
 *.private.postman_environment.json
+.local/
+src/generated/
 

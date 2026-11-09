@@ -35,6 +35,6 @@ for (const variable of environment.values) {
 }
 assert.equal(collection.info.schema, "https://schema.getpostman.com/json/collection/v2.1.0/collection.json");
 assert.equal(sdk.items.count(), collection.item.length);
-assert.equal(requests, 27);
+assert.equal(requests, 28);
 console.log("PASS: " + requests + " requests, " + scripts + " scripts; SDK import, variables, syntax, and blank example secrets.");
 console.log("Offline validation only; this command does not test backend responses.");

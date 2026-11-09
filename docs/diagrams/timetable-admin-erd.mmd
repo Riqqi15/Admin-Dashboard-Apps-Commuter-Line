@@ -45,6 +45,8 @@ erDiagram
     CAMERA_SESSIONS {
         uuid id PK
         uuid external_session_id UK
+        char payload_fingerprint
+        int consecutive_failures
         uuid tracked_user_id FK
         uuid station_id FK
         enum source
@@ -58,6 +60,7 @@ erDiagram
     CAMERA_EVENTS {
         uuid id PK
         uuid event_id UK
+        char payload_fingerprint
         uuid camera_session_id FK
         enum type
         varchar error_code
@@ -68,7 +71,8 @@ erDiagram
 
     ALERTS {
         uuid id PK
-        uuid camera_session_id FK, UK
+        uuid camera_session_id FK, UK "nullable after retention"
+        uuid source_session_id UK "retained origin reference"
         uuid station_id FK
         uuid tracked_user_id FK
         uuid assigned_to_id FK
@@ -114,7 +118,7 @@ erDiagram
     STATIONS ||--o{ CAMERA_SESSIONS : "scopes"
     TRACKED_USERS ||--o{ CAMERA_SESSIONS : "starts"
     CAMERA_SESSIONS ||--o{ CAMERA_EVENTS : "contains"
-    CAMERA_SESSIONS ||--o| ALERTS : "triggers"
+    CAMERA_SESSIONS o|--o| ALERTS : "triggers until retention"
     STATIONS ||--o{ ALERTS : "receives"
     TRACKED_USERS o|--o{ ALERTS : "reported for"
     ADMIN_USERS o|--o{ ALERTS : "handles"

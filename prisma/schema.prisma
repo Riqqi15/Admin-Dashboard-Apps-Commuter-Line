@@ -1,0 +1,211 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  STATION_SECURITY
+}
+
+enum CameraSessionStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+}
+
+enum CameraEventType {
+  SESSION_STARTED
+  CAMERA_INIT_FAILED
+  ANALYSIS_FAILED
+  ANALYSIS_RECOVERED
+  SESSION_ENDED
+}
+
+enum AlertStatus {
+  NEW
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum IngestSource {
+  SIMULATOR
+  MOBILE
+}
+
+model Station {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(20)
+  name      String   @db.VarChar(120)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  staff     AdminUser[]
+  sessions  CameraSession[]
+  alerts    Alert[]
+  auditLogs AuditLog[]
+  stats     DailyUsageStat[]
+
+  @@map("stations")
+}
+
+model AdminUser {
+  id                 String       @id @default(uuid()) @db.Uuid
+  username           String       @unique @db.VarChar(50)
+  passwordHash       String       @map("password_hash") @db.Text
+  role               AdminRole
+  stationId          String?      @map("station_id") @db.Uuid
+  isActive           Boolean      @default(true) @map("is_active")
+  mustChangePassword Boolean      @default(true) @map("must_change_password")
+  lastLoginAt        DateTime?    @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  station            Station?     @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  sessions           AdminSession[]
+  alerts             Alert[]
+  auditLogs          AuditLog[]
+
+  @@index([stationId])
+  @@map("admin_users")
+}
+
+model AdminSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  adminUserId   String    @map("admin_user_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash") @db.Char(64)
+  csrfTokenHash String    @map("csrf_token_hash") @db.Char(64)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  adminUser     AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+
+  @@index([adminUserId, expiresAt])
+  @@index([expiresAt])
+  @@map("admin_sessions")
+}
+
+model TrackedUser {
+  id                    String   @id @default(uuid()) @db.Uuid
+  externalUserId        String   @unique @map("external_user_id") @db.VarChar(100)
+  displayNameCiphertext String   @map("display_name_ciphertext") @db.Text
+  phoneCiphertext       String?  @map("phone_ciphertext") @db.Text
+  firstSeenAt           DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt            DateTime @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt             DateTime @map("expires_at") @db.Timestamptz(3)
+  sessions              CameraSession[]
+  alerts                Alert[]
+
+  @@index([expiresAt])
+  @@map("tracked_users")
+}
+
+model CameraSession {
+  id                  String              @id @default(uuid()) @db.Uuid
+  externalSessionId   String              @unique @map("external_session_id") @db.Uuid
+  payloadFingerprint  String              @map("payload_fingerprint") @db.Char(64)
+  trackedUserId       String              @map("tracked_user_id") @db.Uuid
+  stationId           String              @map("station_id") @db.Uuid
+  source              IngestSource
+  status              CameraSessionStatus @default(ACTIVE)
+  consecutiveFailures Int                 @default(0) @map("consecutive_failures")
+  startedAt           DateTime            @map("started_at") @db.Timestamptz(3)
+  endedAt             DateTime?           @map("ended_at") @db.Timestamptz(3)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt           DateTime            @map("expires_at") @db.Timestamptz(3)
+  trackedUser         TrackedUser         @relation(fields: [trackedUserId], references: [id], onDelete: Restrict)
+  station             Station             @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  events              CameraEvent[]
+  alert               Alert?
+
+  @@index([stationId, startedAt(sort: Desc)])
+  @@index([trackedUserId])
+  @@index([expiresAt])
+  @@map("camera_sessions")
+}
+
+model CameraEvent {
+  id                 String          @id @default(uuid()) @db.Uuid
+  eventId            String          @unique @map("event_id") @db.Uuid
+  payloadFingerprint String          @map("payload_fingerprint") @db.Char(64)
+  cameraSessionId    String          @map("camera_session_id") @db.Uuid
+  type               CameraEventType
+  errorCode          String?         @map("error_code") @db.VarChar(80)
+  occurredAt         DateTime        @map("occurred_at") @db.Timestamptz(3)
+  receivedAt         DateTime        @default(now()) @map("received_at") @db.Timestamptz(3)
+  expiresAt          DateTime        @map("expires_at") @db.Timestamptz(3)
+  cameraSession      CameraSession   @relation(fields: [cameraSessionId], references: [id], onDelete: Restrict)
+
+  @@index([cameraSessionId, occurredAt])
+  @@index([expiresAt])
+  @@map("camera_events")
+}
+
+model Alert {
+  id                  String          @id @default(uuid()) @db.Uuid
+  cameraSessionId     String?         @unique @map("camera_session_id") @db.Uuid
+  sourceSessionId     String          @unique @map("source_session_id") @db.Uuid
+  stationId           String          @map("station_id") @db.Uuid
+  trackedUserId       String?         @map("tracked_user_id") @db.Uuid
+  userNameCiphertext  String?         @map("user_name_ciphertext") @db.Text
+  userPhoneCiphertext String?         @map("user_phone_ciphertext") @db.Text
+  failureType         CameraEventType @map("failure_type")
+  errorCode           String?         @map("error_code") @db.VarChar(80)
+  status              AlertStatus     @default(NEW)
+  assignedToId        String?         @map("assigned_to_id") @db.Uuid
+  resolutionNote      String?         @map("resolution_note") @db.VarChar(1000)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  acknowledgedAt      DateTime?       @map("acknowledged_at") @db.Timestamptz(3)
+  resolvedAt          DateTime?       @map("resolved_at") @db.Timestamptz(3)
+  piiPurgedAt         DateTime?       @map("pii_purged_at") @db.Timestamptz(3)
+  expiresAt           DateTime        @map("expires_at") @db.Timestamptz(3)
+  cameraSession       CameraSession?  @relation(fields: [cameraSessionId], references: [id], onDelete: SetNull)
+  station             Station         @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  trackedUser         TrackedUser?    @relation(fields: [trackedUserId], references: [id], onDelete: SetNull)
+  assignedTo          AdminUser?      @relation(fields: [assignedToId], references: [id], onDelete: Restrict)
+
+  @@index([stationId, status, createdAt(sort: Desc)])
+  @@index([trackedUserId])
+  @@index([assignedToId])
+  @@index([expiresAt])
+  @@map("alerts")
+}
+
+model AuditLog {
+  id               String     @id @default(uuid()) @db.Uuid
+  actorAdminUserId String?    @map("actor_admin_user_id") @db.Uuid
+  stationId        String?    @map("station_id") @db.Uuid
+  action           String     @db.VarChar(80)
+  entityType       String     @map("entity_type") @db.VarChar(50)
+  entityId         String?    @map("entity_id") @db.Uuid
+  details          Json?      @db.JsonB
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt        DateTime   @map("expires_at") @db.Timestamptz(3)
+  actor            AdminUser? @relation(fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+  station          Station?   @relation(fields: [stationId], references: [id], onDelete: Restrict)
+
+  @@index([actorAdminUserId, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("audit_logs")
+}
+
+model DailyUsageStat {
+  id                     String   @id @default(uuid()) @db.Uuid
+  stationId              String   @map("station_id") @db.Uuid
+  statDate               DateTime @map("stat_date") @db.Date
+  sessionCount           Int      @default(0) @map("session_count")
+  uniqueUserCount        Int      @default(0) @map("unique_user_count")
+  failedSessionCount     Int      @default(0) @map("failed_session_count")
+  alertCount             Int      @default(0) @map("alert_count")
+  resolvedAlertCount     Int      @default(0) @map("resolved_alert_count")
+  averageResponseSeconds Int?     @map("average_response_seconds")
+  station                Station  @relation(fields: [stationId], references: [id], onDelete: Restrict)
+
+  @@unique([stationId, statDate])
+  @@map("daily_usage_stats")
+}

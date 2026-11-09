@@ -7,6 +7,17 @@ Waktu: ISO 8601 UTC
 
 Dokumen ini adalah kontrak desain. OpenAPI YAML final dibuat pada tahap implementasi.
 
+## Status implementasi health
+
+Endpoint di luar base path `/api/v1` yang sudah tersedia:
+
+| Method | Path | Respons |
+|---|---|---|
+| GET | `/health`, `/health/live` | 200, `data.status=ok`; liveness tanpa query database |
+| GET | `/health/ready` | 200, `data.status=ready` dan `data.database=connected` setelah query PostgreSQL; 503 `DATABASE_UNAVAILABLE` bila koneksi gagal |
+
+Endpoint bisnis di bagian berikut masih kontrak desain dan belum diimplementasikan.
+
 ## 1. Format response
 
 Berhasil:

@@ -1,48 +1,50 @@
 # Progress backend — 9 November 2026
 
-## Tersedia dan sudah diverifikasi
+## Checkpoint A: fondasi, database, dan HTTP baseline
 
-- Fondasi Express + TypeScript; `createApp` terpisah dari listener agar dapat diuji.
-- Environment divalidasi dengan Zod; konfigurasi production menolak origin localhost/non-HTTPS, proxy yang belum ditentukan, dan key simulator.
-- `.env` lokal dihasilkan oleh `npm run setup:local` dengan secret acak, tidak dicetak ke log, dan tidak ditimpa saat perintah diulang.
-- `GET /health` dan `GET /health/live`: HTTP 200, JSON `{ "success": true, "data": { "status": "ok" } }`. Keduanya liveness tanpa query database.
-- Header Helmet/CSP untuk API, no-store, ID request dari server, origin allowlist dengan credentials, dan error JSON aman.
-- Parser JSON memilih batas 32 KiB umum atau 16 KiB ingest; kompresi request tidak diterima.
-- Log HTTP hanya memuat metadata allowlist; URL, query, body, headers, dan teks error internal tidak dicatat.
-- Timeout request/header, penanganan kegagalan listener, dan shutdown bertenggat tersedia pada server.
-- 12 tes environment dan HTTP lulus; typecheck dan build lulus.
-- Newman mengirim request `/health` ke server lokal: 1 request dan 4 assertion lulus. Ini bukan hasil untuk 26 request bisnis lainnya.
-- Compose database terpisah berhasil melewati `docker compose config --quiet`.
-- Prisma CLI/Client sudah selaras pada 7.10.1. Audit produksi melaporkan 0 vulnerability; 16 temuan development masih terbuka. Lihat [triase dependency](dependency-audit.md).
+Task 1–3 sudah diimplementasikan dan diverifikasi secara lokal. Liveness/readiness dari Task 10 dimajukan agar koneksi API–database dapat diuji melalui Postman. Backend bisnis belum tersedia.
 
-## Kendala database
+### Fondasi dan keamanan HTTP
 
-Docker Desktop berjalan sebagai proses, tetapi engine Linux tidak tersedia. `docker version` gagal mengakses pipe `dockerDesktopLinuxEngine`. Log backend Docker menunjukkan kegagalan startup:
+- Express/TypeScript, konfigurasi environment Zod, CORS allowlist, Helmet/CSP, no-store, ID request dari server, dan error JSON aman.
+- Batas JSON 32 KiB umum / 16 KiB ingest; logging hanya metadata allowlist.
+- Timeout server dan graceful shutdown termasuk disconnect Prisma.
+- `setup:local` menghasilkan secret acak tanpa mencetak atau menimpa nilai yang sudah ada.
 
-```text
-starting services: initializing Ingest server ... sailor-ingest.sock:
-The file cannot be accessed by the system.
-```
+### PostgreSQL dan Prisma
 
-Compose hanya tervalidasi secara konfigurasi; PostgreSQL belum dinyalakan. Tidak dilakukan factory reset, penghapusan socket/volume, atau perubahan terhadap proyek lain. Docker Desktop perlu dipulihkan sebelum migration dan integration test PostgreSQL dapat dilanjutkan.
+- Instance PostgreSQL **18.4 native**, khusus repository ini, aktif di `127.0.0.1:5434`, database `timetable_admin`.
+- Data berada di `.local/postgres/data`; tidak menggunakan service atau database proyek lain.
+- Schema sembilan model, lima enum, index/unique/FK, serta migration `20261109112926_initial_schema` diterapkan ke database kosong.
+- Constraint PostgreSQL memaksa role/stasiun konsisten, username lowercase, kode stasiun uppercase, counter non-negatif, serta field status alert konsisten.
+- Prisma Client/CLI/adapter-pg memakai 7.10.1. Client dihasilkan dari schema, bukan dikomit.
+- Seed dua stasiun dan tiga akun demo berulang menghasilkan ID yang sama dan mempertahankan sandi. Password di-hash Argon2id (64 MiB, 3 iterasi, paralelisme 1); akun ditandai wajib mengganti sandi.
+- Sandi demo acak disimpan di `.env.seed.local`, bukan di repository.
 
-## Belum dikerjakan
+### Health dan bukti
 
-- Schema/migration/seed Prisma dan koneksi PostgreSQL (Task 2).
-- Login username/sandi, cookie session, CSRF dan rate limit login (Task 4).
-- RBAC dan isolasi stasiun (Task 5).
-- Ingest kamera, lifecycle alert, SSE, analytics, audit, retensi dan OpenAPI (Tasks 6–10).
-- Acceptance suite Postman lengkap dan release gate (Tasks 11–12).
+- `GET /health` / `GET /health/live`: 200, tanpa query database.
+- `GET /health/ready`: query PostgreSQL nyata, 200 bila terhubung atau 503 `DATABASE_UNAVAILABLE` bila gagal.
+- **20 tes** environment, HTTP, database, seed, dan readiness lulus.
+- Typecheck dan build lulus; migration status up to date.
+- Newman: **2 request, 7 assertion lulus** (health/readiness). Collection memiliki 28 request; 26 request bisnis lainnya masih draft.
+- Uji gangguan nyata: instance database proyek dihentikan; liveness tetap 200, readiness 503 tanpa detail internal. Instance dinyalakan lagi dan Newman kembali lulus.
+- Audit produksi: 0 temuan; 16 temuan development tetap terbuka. Lihat [triase dependency](dependency-audit.md).
 
-Task 1 dan baseline HTTP Task 3 dikerjakan terlebih dahulu karena tidak memerlukan database. Checkpoint A belum lengkap sampai Task 2 terverifikasi. Keamanan HTTP dasar tidak menggantikan autentikasi/otorisasi yang masih akan dibuat.
+## Penyesuaian desain dan pelaksanaan
 
-Penyesuaian teknis dari contoh rencana: `tsconfig.json` memeriksa source dan tes dengan root `.`; `tsconfig.build.json` hanya membangun source ke `dist` agar entrypoint tetap `dist/server.js`. Script untuk seed/simulator/retensi belum ditambahkan sampai implementasinya tersedia. `.env` dimuat memakai flag native Node, sehingga dependency dotenv tidak diperlukan.
+Relasi alert ke sesi dibuat nullable dengan ON DELETE SET NULL. Referensi `source_session_id` unik mempertahankan asal sesi setelah sesi 7 hari dihapus, sehingga metadata alert dapat bertahan 30 hari. Worker retensi dan penghapusan snapshot PII belum diimplementasikan; perubahan FK sendiri tidak menghapus nama/telepon pada snapshot. Schema, migration, dokumen database, source Mermaid, PNG, dan SVG telah diselaraskan.
 
-## Cara melanjutkan
+Docker Desktop masih gagal startup pada socket internal `sailor-ingest.sock`. Native PostgreSQL yang sudah terpasang dipakai sebagai alternatif development; tidak dilakukan factory reset atau penghapusan data Docker. Compose PostgreSQL 17 tetap tersedia sebagai pilihan terpisah, tetapi test runtime saat ini menggunakan native 18. Jangan menjalankan kedua penyedia bersamaan di port 5434.
 
-1. Pulihkan Docker Desktop hingga `docker version` menampilkan bagian Server.
-2. Jalankan `docker compose up -d db` pada repository ini; verifikasi database sehat pada port lokal 5434.
-3. Pastikan Prisma CLI dan Client memakai versi kompatibel; lanjut schema, constraint role/stasiun, migration, seed, dan tes koneksi sesuai rencana.
-4. Lanjut autentikasi dan batas akses stasiun sebelum membuka endpoint data pengguna.
+`tsconfig.json` memeriksa source, tes, konfigurasi Prisma, dan seed. `tsconfig.build.json` membangun source ke `dist`. Environment dimuat melalui fasilitas native Node. Script seed/simulator/retensi hanya ditambahkan saat implementasinya tersedia.
 
-Petunjuk menjalankan API lokal ada di [README](../README.md). Rencana lengkap ada di [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).
+## Berikutnya
+
+- Task 4: login username/sandi, sesi cookie, CSRF, rate limit, ganti sandi, dan revokasi sesi.
+- Task 5: manajemen stasiun/staff dan pengujian isolasi stasiun (Checkpoint B).
+- Tasks 6–12: ingest, alert, SSE, analytics/audit/retensi, simulator/OpenAPI, acceptance penuh, CI dan release gate.
+
+Tidak ada endpoint data pengguna yang dibuka pada tahap ini. Repository Timetable milik dosen tidak diubah dan tidak ada push GitHub.
+
+Lihat [README](../README.md) untuk perintah setup, serta [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).

@@ -1,10 +1,13 @@
 import { createServer } from 'node:http';
 import { createApp } from './app';
 import { parseEnv } from './config/env';
+import { createPrisma } from './lib/prisma';
+import { createLogger } from './http/request-context';
 
 try {
   const config = parseEnv(process.env);
-  const server = createServer(createApp(config));
+  const prisma = createPrisma(config.DATABASE_URL);
+  const server = createServer(createApp(config, createLogger(config), () => prisma.$queryRaw`SELECT 1`));
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   server.keepAliveTimeout = 5_000;
@@ -25,7 +28,8 @@ try {
       process.exit(1);
     }, 10_000);
     timeout.unref();
-    server.close(error => {
+    server.close(async error => {
+      try { await prisma.$disconnect(); } catch { error ||= new Error('Database shutdown failed'); }
       clearTimeout(timeout);
       process.exitCode = error ? 1 : 0;
     });

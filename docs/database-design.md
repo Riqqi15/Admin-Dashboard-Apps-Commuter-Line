@@ -14,7 +14,7 @@ erDiagram
     STATION ||--o{ CAMERA_SESSION : contains
     TRACKED_USER ||--o{ CAMERA_SESSION : starts
     CAMERA_SESSION ||--o{ CAMERA_EVENT : records
-    CAMERA_SESSION ||--o| ALERT : creates
+    CAMERA_SESSION o|--o| ALERT : creates
     ADMIN_USER ||--o{ ADMIN_SESSION : owns
     ADMIN_USER ||--o{ ALERT : handles
     ADMIN_USER ||--o{ AUDIT_LOG : performs
@@ -84,10 +84,12 @@ erDiagram
 |---|---|---|
 | 'id' | UUID | Primary key |
 | 'external_session_id' | UUID | Unik/idempotent |
+| 'payload_fingerprint' | char(64) | Pembanding payload untuk idempotency; diisi saat ingest |
 | 'tracked_user_id' | UUID | Foreign key |
 | 'station_id' | UUID | Foreign key |
 | 'source' | 'IngestSource' | Wajib |
 | 'status' | 'CameraSessionStatus' | Default ACTIVE |
+| 'consecutive_failures' | integer | Default 0, non-negatif; dievaluasi dalam transaksi ingest |
 | 'started_at', 'ended_at' | timestamptz | 'ended_at' nullable |
 | 'created_at' | timestamptz | Wajib |
 | 'expires_at' | timestamptz | Retensi 7 hari |
@@ -98,6 +100,7 @@ erDiagram
 |---|---|---|
 | 'id' | UUID | Primary key |
 | 'event_id' | UUID | Unik/idempotent |
+| 'payload_fingerprint' | char(64) | Pembanding payload untuk idempotency; diisi saat ingest |
 | 'camera_session_id' | UUID | Foreign key |
 | 'type' | 'CameraEventType' | Wajib |
 | 'error_code' | varchar(80) nullable | Allowlist |
@@ -109,7 +112,8 @@ erDiagram
 | Kolom | Tipe | Aturan |
 |---|---|---|
 | 'id' | UUID | Primary key |
-| 'camera_session_id' | UUID | Unik, maksimal satu alert per sesi |
+| 'camera_session_id' | UUID nullable | FK unik; ON DELETE SET NULL saat sesi dihapus setelah retensi |
+| 'source_session_id' | UUID | ID internal sesi asal, unik dan tetap disimpan sebagai metadata setelah FK dilepas |
 | 'station_id' | UUID | Foreign key |
 | 'tracked_user_id' | UUID nullable | Dilepas saat anonimisasi |
 | 'user_name_ciphertext' | text nullable | Dihapus setelah 7 hari |
@@ -159,6 +163,9 @@ erDiagram
 - Index 'camera_events(camera_session_id, occurred_at)'.
 - Index 'audit_logs(actor_admin_user_id, created_at desc)'.
 - Foreign key memakai RESTRICT atau soft-disable untuk data operasional; riwayat tidak dihapus secara cascade tanpa job retensi.
+- Pengecualian retensi: FK alert ke sesi/pengguna memakai SET NULL, sehingga sesi/PII dapat dihapus setelah 7 hari tanpa menghapus alert 30 hari. Identitas nama/telepon pada snapshot alert tetap wajib dikosongkan oleh worker; SET NULL sendiri bukan anonimisasi lengkap.
+- `source_session_id` tidak memakai FK setelah penghapusan sesi. Check constraint mewajibkan nilainya sama dengan `camera_session_id` selama FK masih terisi; unique constraint mempertahankan satu alert per asal sesi.
+- Constraint tambahan menolak username non-lowercase, kode stasiun kosong/non-uppercase, counter negatif, tipe alert non-kegagalan, dan kombinasi field status alert yang tidak konsisten.
 
 ## 5. Transaksi penting
 

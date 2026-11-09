@@ -22,6 +22,8 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 
 ## Authorization
 
+Bukti awal database: constraint `admin_users_role_station_check` dan integration test `tests/integration/database.test.ts` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Ini belum membuktikan otorisasi endpoint/BOLA; item di bawah tetap terbuka sampai Task 5.
+
 - [ ] Pemeriksaan role dilakukan pada backend.
 - [ ] Filter 'station_id' diterapkan pada service/query, bukan hanya controller/UI.
 - [ ] Petugas tidak dapat memilih station scope melalui query parameter.
