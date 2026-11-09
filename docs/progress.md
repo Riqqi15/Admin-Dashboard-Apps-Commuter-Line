@@ -35,9 +35,13 @@ Task 1–3 sudah diimplementasikan dan diverifikasi secara lokal. Liveness/readi
 
 Relasi alert ke sesi dibuat nullable dengan ON DELETE SET NULL. Referensi `source_session_id` unik mempertahankan asal sesi setelah sesi 7 hari dihapus, sehingga metadata alert dapat bertahan 30 hari. Worker retensi dan penghapusan snapshot PII belum diimplementasikan; perubahan FK sendiri tidak menghapus nama/telepon pada snapshot. Schema, migration, dokumen database, source Mermaid, PNG, dan SVG telah diselaraskan.
 
-Docker Desktop masih gagal startup pada socket internal `sailor-ingest.sock`. Native PostgreSQL yang sudah terpasang dipakai sebagai alternatif development; tidak dilakukan factory reset atau penghapusan data Docker. Compose PostgreSQL 17 tetap tersedia sebagai pilihan terpisah, tetapi test runtime saat ini menggunakan native 18. Jangan menjalankan kedua penyedia bersamaan di port 5434.
+Docker Desktop masih gagal startup pada socket internal `sailor-ingest.sock`. Native PostgreSQL yang sudah terpasang dipakai sebagai alternatif development; tidak dilakukan factory reset atau penghapusan data Docker. Compose PostgreSQL 17 tersedia pada port host 5435, terpisah dari native 18 pada port 5434.
 
 `tsconfig.json` memeriksa source, tes, konfigurasi Prisma, dan seed. `tsconfig.build.json` membangun source ke `dist`. Environment dimuat melalui fasilitas native Node. Script seed/simulator/retensi hanya ditambahkan saat implementasinya tersedia.
+
+## Tambahan Docker (build belum terverifikasi)
+
+Dockerfile multi-stage, `.dockerignore` allowlist, dan Compose API + migration + PostgreSQL sudah ditambahkan. Compose memakai port host `3001`/`5435` agar berbeda dari native. Validasi Compose dan pemeriksaan runtime production-only pada host lulus. Percobaan build masih gagal sebelum image dibangun karena engine Docker Desktop tidak tersedia. Bukti serta langkah pemulihan aman ada di [panduan Docker](docker.md). Ini mengerjakan bagian packaging dari Task 12; CI dan release gate belum selesai.
 
 ## Berikutnya
 
@@ -45,6 +49,6 @@ Docker Desktop masih gagal startup pada socket internal `sailor-ingest.sock`. Na
 - Task 5: manajemen stasiun/staff dan pengujian isolasi stasiun (Checkpoint B).
 - Tasks 6–12: ingest, alert, SSE, analytics/audit/retensi, simulator/OpenAPI, acceptance penuh, CI dan release gate.
 
-Tidak ada endpoint data pengguna yang dibuka pada tahap ini. Repository Timetable milik dosen tidak diubah dan tidak ada push GitHub.
+Tidak ada endpoint data pengguna yang dibuka pada tahap ini. Repository Timetable milik dosen tidak diubah. Progres sampai commit `3db0258` sudah dipush ke branch `codex/backend-foundation`; perubahan Docker sesudahnya masih lokal.
 
 Lihat [README](../README.md) untuk perintah setup, serta [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).

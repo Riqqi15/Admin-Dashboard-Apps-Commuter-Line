@@ -43,7 +43,9 @@ npm test
 
 `db:start` dapat diulang; `db:status` memeriksa instance dan `db:stop` menghentikan instance milik repository ini. Sandi database berada di `.env`; sandi tiga akun demo di `.env.seed.local`. Kedua file diabaikan Git dan tidak dicetak ke terminal. Seed mengisi `superadmin`, `security.manggarai`, dan `security.tanahabang`, dengan kewajiban mengganti sandi saat alur auth tersedia. Seed ulang tidak mereset akun yang ada.
 
-Alternatif Docker tetap tersedia melalui `docker compose up -d db` dengan PostgreSQL 17. Gunakan hanya satu penyedia database pada port 5434. Volume Docker dan data native terpisah; jalankan migration/seed masing-masing bila berpindah penyedia. Docker Desktop lokal saat ini bermasalah pada startup, jadi bukti integration test saat ini berasal dari PostgreSQL native 18.
+Alternatif Docker menyediakan API + migration + PostgreSQL 17. Port host default Docker adalah API `3001` dan database `5435`, sehingga berbeda dari native `3000`/`5434`. Volume Docker dan data native terpisah. Docker Desktop lokal masih bermasalah pada startup; build image belum dapat diverifikasi. Lihat [panduan Docker](docs/docker.md).
+
+Setelah engine aktif: jalankan `npm run docker:build` lalu `npm run docker:up`. Uji Docker API di `http://127.0.0.1:3001/health/ready`.
 
 ## Dokumentasi
 
@@ -56,6 +58,7 @@ Alternatif Docker tetap tersedia melalui `docker compose up -d db` dengan Postgr
 - [Security checklist](docs/security-checklist.md)
 - [Test plan](docs/test-plan.md)
 - [Collection dan panduan Postman](postman/README.md)
+- [Docker build dan deployment lokal](docs/docker.md)
 - [Implementation plan](docs/superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md)
 
 ## Batas scope

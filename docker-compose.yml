@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Run npm run setup:local first}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup:local first}
     ports:
-      - "127.0.0.1:5434:5432"
+      - "127.0.0.1:${DOCKER_DB_PORT:-5435}:5432"
     volumes:
       - admin_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +15,58 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  migrate:
+    image: timetable-admin-migrate:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Run npm run setup:local first}:${POSTGRES_PASSWORD:?Run npm run setup:local first}@db:5432/${POSTGRES_DB:?Run npm run setup:local first}
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: "no"
+
+  api:
+    image: timetable-admin-backend:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    init: true
+    environment:
+      NODE_ENV: ${DOCKER_API_NODE_ENV:-development}
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Run npm run setup:local first}:${POSTGRES_PASSWORD:?Run npm run setup:local first}@db:5432/${POSTGRES_DB:?Run npm run setup:local first}
+      SESSION_PEPPER: ${SESSION_PEPPER:?Run npm run setup:local first}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?Run npm run setup:local first}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Run npm run setup:local first}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${DOCKER_API_PORT:-3001}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16777216
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 15s
     restart: unless-stopped
 volumes:
   admin_db_data:

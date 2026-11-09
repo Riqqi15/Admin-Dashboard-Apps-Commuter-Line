@@ -28,7 +28,12 @@
     "prisma:validate": "prisma validate --config prisma.config.ts",
     "prisma:migrate": "prisma migrate deploy --config prisma.config.ts",
     "prisma:status": "prisma migrate status --config prisma.config.ts",
-    "prisma:seed": "node --env-file=.env --env-file=.env.seed.local --import tsx prisma/seed.ts"
+    "prisma:seed": "node --env-file=.env --env-file=.env.seed.local --import tsx prisma/seed.ts",
+    "docker:config": "docker compose config --quiet",
+    "docker:build": "docker compose build api migrate",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f api migrate"
   },
   "keywords": [],
   "author": "",

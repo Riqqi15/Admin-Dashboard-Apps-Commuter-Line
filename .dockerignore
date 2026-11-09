@@ -1,0 +1,15 @@
+# Allowlist build inputs. Secrets, database data, Git history and test artifacts stay out.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!prisma.config.ts
+!src/
+!src/**
+!prisma/
+!prisma/schema.prisma
+!prisma/migrations/
+!prisma/migrations/**
+# Always regenerate Prisma Client inside the Linux build stage.
+src/generated/
