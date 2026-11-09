@@ -10,7 +10,7 @@
 2. Tahap pertama berfokus pada Express/TypeScript, PostgreSQL, Prisma, SSE, seed data, simulator, Swagger, Postman, dan Newman.
 3. Aplikasi mobile dianggap selesai. Integrasi production nanti cukup mengirim event ke API baru dari salinan atau fork yang dikelola pemilik proyek.
 4. Super Admin dapat melihat seluruh stasiun. Petugas Stasiun hanya dapat melihat dan menangani data satu stasiun penugasannya.
-5. Login dashboard memakai username dan kata sandi.
+5. Login dashboard memakai username dan kata sandi. Versi demo capstone tidak memakai 2FA/MFA, PIN tambahan, atau OTP; proteksi session, CSRF, pembatasan percobaan login, dan scope stasiun tetap diperlukan.
 6. Pengguna mobile mengonfirmasi rekomendasi stasiun terdekat sebelum sesi kamera dicatat.
 7. Kamera yang gagal dimulai membuat alert langsung. Tiga kegagalan analisis berturut-turut membuat satu alert untuk sesi tersebut.
 8. Status alert adalah 'NEW', 'ACKNOWLEDGED', dan 'RESOLVED'.

@@ -25,6 +25,7 @@ Pengelola belum memiliki sumber data terpusat untuk mengetahui berapa pengguna m
 - Menyimpan gambar, rekaman, atau frame kamera.
 - Membuat web dashboard pada tahap pertama.
 - Mengirim WhatsApp atau SMS.
+- Autentikasi dua faktor (2FA/MFA), PIN tambahan, serta OTP melalui SMS, email, atau aplikasi authenticator pada versi demo capstone.
 - Mengelola jadwal, rute, atau tiket kereta.
 
 ## 5. Aktor
@@ -52,7 +53,7 @@ Pengelola belum memiliki sumber data terpusat untuk mengetahui berapa pengguna m
 
 | ID | Kebutuhan |
 |---|---|
-| FR-001 | Sistem menyediakan login dashboard menggunakan username dan kata sandi. |
+| FR-001 | Sistem menyediakan login dashboard menggunakan username dan kata sandi, tanpa tahap 2FA, PIN tambahan, atau OTP pada versi demo capstone. |
 | FR-002 | Super Admin dapat mengelola akun Petugas Stasiun. |
 | FR-003 | Setiap Petugas Stasiun wajib memiliki tepat satu stasiun aktif. |
 | FR-004 | Petugas hanya dapat membaca dan mengubah resource pada stasiunnya. |

@@ -322,6 +322,8 @@ rtk git commit -m "feat: add secure http baseline"
 
 ### Task 4: Implement username/password authentication and opaque sessions
 
+Keputusan pengguna untuk demo capstone: implementasikan login username/password tanpa challenge 2FA/MFA, PIN tambahan, atau OTP. Tetap terapkan seluruh kontrol session, CSRF, hashing password, rate limit, dan otorisasi yang direncanakan. Token CSRF tidak memerlukan input kode dari pengguna.
+
 **Files:**
 - Create: 'src/features/auth/auth.schema.ts'
 - Create: 'src/features/auth/auth.service.ts'

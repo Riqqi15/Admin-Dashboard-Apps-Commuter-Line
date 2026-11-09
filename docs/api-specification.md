@@ -43,6 +43,8 @@ Gagal:
 
 ## 2. Authentication
 
+Keputusan scope demo: login hanya membutuhkan `username` dan `password`. Tidak ada challenge/endpoint 2FA, PIN tambahan, atau OTP. Cookie sesi dan CSRF token tetap dikelola otomatis oleh client, tanpa kode tambahan yang dimasukkan pengguna. Hashing password, masa berlaku sesi, rate limit login, serta otorisasi per stasiun tetap berlaku.
+
 | Method | Path | Akses | Keterangan |
 |---|---|---|---|
 | POST | '/auth/login' | Publik | Login username/password, membuat cookie sesi dan CSRF token |
