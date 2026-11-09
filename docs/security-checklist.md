@@ -41,11 +41,11 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 ## CSRF, CORS, dan HTTP
 
 - [ ] Mutasi berbasis cookie memakai CSRF token dan pemeriksaan Origin.
-- [ ] CORS memakai allowlist tanpa wildcard credentials.
+- [x] CORS memakai allowlist tanpa wildcard credentials. Bukti: `src/http/security.ts`, `tests/security/http-baseline.test.ts`.
 - [ ] Helmet dan CSP disetel sesuai deployment.
-- [ ] Header x-powered-by dinonaktifkan.
+- [x] Header x-powered-by dinonaktifkan. Bukti: `src/app.ts`, `tests/security/http-baseline.test.ts`.
 - [ ] Production memakai HTTPS.
-- [ ] trust proxy tidak disetel true secara buta.
+- [x] trust proxy tidak disetel true secara buta. Bukti: `src/config/env.ts`, `src/app.ts`, `tests/unit/env.test.ts`.
 - [ ] Timeout server, body limit, dan connection handling dikonfigurasi.
 
 ## Ingest dan replay protection
@@ -60,7 +60,7 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 ## PII, logging, dan error
 
 - [ ] Nama dan telepon dienkripsi pada penyimpanan.
-- [ ] Password, cookie, token, secret, dan telepon lengkap diredaksi dari log.
+- [x] Password, cookie, token, secret, dan telepon lengkap diredaksi dari log HTTP dasar melalui metadata allowlist. Bukti: `src/http/request-context.ts`, `tests/security/http-baseline.test.ts`. Audit/domain logging belum tersedia dan tetap perlu diverifikasi ketika dibuat.
 - [ ] Error client generik; detail tersedia hanya pada log aman.
 - [ ] PII dianonimkan setelah 7 hari.
 - [ ] Alert dan audit log dihapus setelah 30 hari.

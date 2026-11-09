@@ -12,6 +12,8 @@
 
 ## Scope and execution rules
 
+Status eksekusi 9 November 2026: fondasi Task 1 dan HTTP baseline Task 3 tersedia; liveness dari Task 10 dimajukan agar Postman dapat diuji. Compose Task 2 tervalidasi, tetapi PostgreSQL/migration/seed terhalang kegagalan Docker Desktop. Rincian bukti, deviasi script/config, serta pekerjaan tersisa dicatat di [progress](../../progress.md). Checkbox langkah asli di bawah dipertahankan sebagai checklist rencana lengkap; jangan menganggap semua checkpoint selesai.
+
 - Work only inside 'C:\Users\riyadh\Documents\ChatGPT\Admin Dashboard'.
 - Do not modify 'C:\Users\riyadh\Timetable-scheduling' or its Git remote.
 - Do not push to GitHub unless the user explicitly requests it.

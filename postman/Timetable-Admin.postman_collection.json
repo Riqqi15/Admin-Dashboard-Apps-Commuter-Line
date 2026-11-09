@@ -1,0 +1,1295 @@
+{
+  "info": {
+    "name": "Timetable Admin API — DRAFT",
+    "description": "Starter pengujian backend capstone. Endpoint health sudah diimplementasikan dan diuji melalui Newman; endpoint bisnis masih draft. Endpoint mengikuti docs/api-specification.md; asumsi schema/header dicatat di postman/README.md. Jalankan alur penuh hanya setelah backend bisnis dan fixture siap.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Health Check",
+      "item": [
+        {
+          "name": "01 Backend hidup",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/health",
+            "description": "Liveness API tanpa query database. Memeriksa status, JSON, response body, dan security header."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Backend hidup: HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Content-Type JSON\", () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test(\"Liveness response sesuai kontrak\", () => pm.expect(pm.response.json()).to.eql({success: true, data: {status: 'ok'}}));",
+                  "pm.test(\"Security header nosniff\", () => pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Authentication",
+      "item": [
+        {
+          "name": "02 Login Super Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/login",
+            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{superAdminUsername}}\",\n  \"password\": \"{{superAdminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.unset(\"csrfToken\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().data[pm.environment.get(\"csrfResponseField\")];",
+                  "  pm.test(\"Login mengembalikan CSRF token\", () => pm.expect(token).to.be.a(\"string\").and.not.empty);",
+                  "  if (typeof token === \"string\" && token) pm.environment.set(\"csrfToken\", token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Profil akun aktif",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Stations",
+      "item": [
+        {
+          "name": "04 Daftar stasiun",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/stations",
+            "description": "Salin UUID stasiun A ke stationId dan stasiun B ke otherStationId pada Environment. Gunakan stasiun dari fixture/seed backend."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Staff Management",
+      "item": [
+        {
+          "name": "05 Daftar petugas (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff",
+            "description": "Akun dummy petugas A dan B disiapkan melalui seed backend; endpoint create belum memiliki schema body final dalam spesifikasi."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Camera Session Ingest",
+      "item": [
+        {
+          "name": "06 Buat sesi simulator stasiun A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/sessions",
+            "description": "Membuat data dummy dan UUID baru setiap Send. Header ingest key masih asumsi draft; lihat README.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"externalUserId\": \"capstone-demo-user\",\n  \"displayName\": \"Pengguna Demo\",\n  \"phone\": \"081234567890\",\n  \"stationId\": \"{{stationId}}\",\n  \"stationConfirmed\": true,\n  \"startedAt\": \"{{sessionStartedAt}}\",\n  \"source\": \"SIMULATOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"externalSessionId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.environment.set(\"sessionStartedAt\", new Date().toISOString());",
+                  "pm.environment.unset(\"alertId\");",
+                  "pm.environment.unset(\"lastEventPayload\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Ulangi sesi identik (idempotency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/sessions",
+            "description": "Jalankan sesudah 06. Menggunakan UUID dan waktu yang sama. Tes awal hanya memeriksa status/response; verifikasi tidak ada duplikasi tetap diperlukan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"externalUserId\": \"capstone-demo-user\",\n  \"displayName\": \"Pengguna Demo\",\n  \"phone\": \"081234567890\",\n  \"stationId\": \"{{stationId}}\",\n  \"stationConfirmed\": true,\n  \"startedAt\": \"{{sessionStartedAt}}\",\n  \"source\": \"SIMULATOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Camera Failure Events",
+      "item": [
+        {
+          "name": "08 Kegagalan analisis ke-1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/events",
+            "description": "Kegagalan ini belum boleh memicu alert; cek daftar alert secara manual sebelum melanjutkan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"eventId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.environment.set(\"occurredAt\", new Date().toISOString());",
+                  "pm.environment.set(\"lastEventPayload\", pm.variables.replaceIn(pm.request.body.raw));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const data = pm.response.json().data;",
+                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Kegagalan analisis ke-2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/events",
+            "description": "Kegagalan ini belum boleh memicu alert; cek daftar alert secara manual sebelum melanjutkan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"eventId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.environment.set(\"occurredAt\", new Date().toISOString());",
+                  "pm.environment.set(\"lastEventPayload\", pm.variables.replaceIn(pm.request.body.raw));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const data = pm.response.json().data;",
+                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Kegagalan analisis ke-3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/events",
+            "description": "Kegagalan ketiga seharusnya menghasilkan satu alert NEW. Jika response berisi data.alertId, nilainya disimpan otomatis. Jika tidak, ambil alertId dari daftar alert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"eventId\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.environment.set(\"occurredAt\", new Date().toISOString());",
+                  "pm.environment.set(\"lastEventPayload\", pm.variables.replaceIn(pm.request.body.raw));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const data = pm.response.json().data;",
+                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Kirim ulang event ketiga",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{ingestKeyHeader}}",
+                "value": "{{ingestKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/ingest/events",
+            "description": "Jalankan setelah 10, dalam 5 menit. Mengirim payload identik. Verifikasi hanya ada satu alert di daftar; status sukses saja belum membuktikan idempotency.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{lastEventPayload}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Alerts",
+      "item": [
+        {
+          "name": "12 Daftar alert",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts",
+            "description": "Cari alert sesi externalSessionId dari request 06. Salin UUID alert itu ke alertId jika belum terisi otomatis; pastikan hanya satu alert NEW."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Detail alert",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Ambil alert",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}/acknowledge",
+            "description": "Gunakan alert NEW. Mengubah NEW menjadi ACKNOWLEDGED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Selesaikan alert",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}/resolve",
+            "description": "Field notes adalah asumsi draft karena schema resolve belum ditentukan. Gunakan alert ACKNOWLEDGED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Simulasi capstone: pengguna telah dibantu petugas.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Analytics",
+      "item": [
+        {
+          "name": "16 Ringkasan dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/dashboard/summary",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 Statistik penggunaan",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/analytics/usage?from={{from}}&to={{to}}&stationId={{stationId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const end = new Date();",
+                  "pm.environment.set(\"to\", end.toISOString());",
+                  "pm.environment.set(\"from\", new Date(end.getTime() - 86400000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 Audit Logs",
+      "item": [
+        {
+          "name": "18 Audit log (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/audit-logs",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Security and Negative Tests",
+      "item": [
+        {
+          "name": "19 Login petugas A",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/login",
+            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{stationSecurityUsername}}\",\n  \"password\": \"{{stationSecurityPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.unset(\"csrfToken\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().data[pm.environment.get(\"csrfResponseField\")];",
+                  "  pm.test(\"Login mengembalikan CSRF token\", () => pm.expect(token).to.be.a(\"string\").and.not.empty);",
+                  "  if (typeof token === \"string\" && token) pm.environment.set(\"csrfToken\", token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 Petugas A membaca alert stasiun A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 Petugas A ditolak mengakses daftar staff",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.expect(pm.response.code).to.be.oneOf([403]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 Login petugas B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/login",
+            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{otherStationSecurityUsername}}\",\n  \"password\": \"{{otherStationSecurityPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.unset(\"csrfToken\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().data[pm.environment.get(\"csrfResponseField\")];",
+                  "  pm.test(\"Login mengembalikan CSRF token\", () => pm.expect(token).to.be.a(\"string\").and.not.empty);",
+                  "  if (typeof token === \"string\" && token) pm.environment.set(\"csrfToken\", token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 Petugas B ditolak membaca alert stasiun A",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403 / 404\", () => pm.expect(pm.response.code).to.be.oneOf([403,404]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 Petugas B ditolak mengubah alert stasiun A",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}/acknowledge",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403 / 404\", () => pm.expect(pm.response.code).to.be.oneOf([403,404]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 Logout petugas B",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "{{csrfHeader}}",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/logout",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json).to.have.property(\"data\");",
+                  "});",
+                  "if (pm.response.code === 200) pm.environment.unset(\"csrfToken\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "26 Profil tanpa sesi ditolak",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.expect(pm.response.code).to.be.oneOf([401]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 Login salah ditolak",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/login",
+            "description": "Satu percobaan login salah. Tidak menjalankan brute-force.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{superAdminUsername}}\",\n  \"password\": \"wrong-password-for-negative-test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.expect(pm.response.code).to.be.oneOf([401]));",
+                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
