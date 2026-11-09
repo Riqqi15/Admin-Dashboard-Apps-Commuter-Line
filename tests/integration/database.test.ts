@@ -6,7 +6,7 @@ import type { Prisma } from '../../src/generated/prisma/client';
 
 loadEnvFile('.env');
 const url = new URL(process.env.DATABASE_URL!);
-if (url.hostname !== '127.0.0.1' || url.port !== '5434' || url.pathname !== '/timetable_admin') {
+if (url.hostname !== '127.0.0.1' || !['5434', '5435'].includes(url.port) || url.pathname !== '/timetable_admin') {
   throw new Error('Database tests require the isolated local capstone database');
 }
 const prisma = createPrisma(url.toString());

@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 FROM node:24-bookworm-slim AS dependencies
 WORKDIR /app
+# Prisma CLI's schema engine needs the system OpenSSL library in build/migration stages.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 

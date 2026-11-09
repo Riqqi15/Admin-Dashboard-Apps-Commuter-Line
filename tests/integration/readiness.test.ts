@@ -9,7 +9,7 @@ import { createPrisma } from '../../src/lib/prisma';
 loadEnvFile('.env');
 const config = parseEnv({ ...process.env, NODE_ENV: 'test', LOG_LEVEL: 'silent' });
 const target = new URL(config.DATABASE_URL);
-if (target.hostname !== '127.0.0.1' || target.port !== '5434' || target.pathname !== '/timetable_admin') throw new Error('Readiness test only targets local capstone database');
+if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin') throw new Error('Readiness test only targets local capstone database');
 const prisma = createPrisma(config.DATABASE_URL);
 const logger = pino({ level: 'silent' });
 afterAll(() => prisma.$disconnect());

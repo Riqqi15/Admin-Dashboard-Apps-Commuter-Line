@@ -1,4 +1,4 @@
-# Progress backend — 9 November 2026
+# Progress backend — 10 November 2026
 
 ## Checkpoint A: fondasi, database, dan HTTP baseline
 
@@ -13,7 +13,7 @@ Task 1–3 sudah diimplementasikan dan diverifikasi secara lokal. Liveness/readi
 
 ### PostgreSQL dan Prisma
 
-- Instance PostgreSQL **18.4 native**, khusus repository ini, aktif di `127.0.0.1:5434`, database `timetable_admin`.
+- Instance PostgreSQL **18.4 native**, khusus repository ini, telah diverifikasi pada 9 November di `127.0.0.1:5434`, database `timetable_admin`. Pengujian terkini pada 10 November menggunakan PostgreSQL Docker.
 - Data berada di `.local/postgres/data`; tidak menggunakan service atau database proyek lain.
 - Schema sembilan model, lima enum, index/unique/FK, serta migration `20261109112926_initial_schema` diterapkan ke database kosong.
 - Constraint PostgreSQL memaksa role/stasiun konsisten, username lowercase, kode stasiun uppercase, counter non-negatif, serta field status alert konsisten.
@@ -35,13 +35,15 @@ Task 1–3 sudah diimplementasikan dan diverifikasi secara lokal. Liveness/readi
 
 Relasi alert ke sesi dibuat nullable dengan ON DELETE SET NULL. Referensi `source_session_id` unik mempertahankan asal sesi setelah sesi 7 hari dihapus, sehingga metadata alert dapat bertahan 30 hari. Worker retensi dan penghapusan snapshot PII belum diimplementasikan; perubahan FK sendiri tidak menghapus nama/telepon pada snapshot. Schema, migration, dokumen database, source Mermaid, PNG, dan SVG telah diselaraskan.
 
-Docker Desktop masih gagal startup pada socket internal `sailor-ingest.sock`. Native PostgreSQL yang sudah terpasang dipakai sebagai alternatif development; tidak dilakukan factory reset atau penghapusan data Docker. Compose PostgreSQL 17 tersedia pada port host 5435, terpisah dari native 18 pada port 5434.
+Kendala startup Docker Desktop pada `sailor-ingest.sock` terjadi pada 9 November. Pada 10 November, engine kembali dapat dihubungi dan container Linux berhasil dijalankan. Native PostgreSQL 18 tetap menjadi alternatif lokal; Compose PostgreSQL 17.11 memakai port host 5435, terpisah dari port native 5434.
 
 `tsconfig.json` memeriksa source, tes, konfigurasi Prisma, dan seed. `tsconfig.build.json` membangun source ke `dist`. Environment dimuat melalui fasilitas native Node. Script seed/simulator/retensi hanya ditambahkan saat implementasinya tersedia.
 
-## Tambahan Docker (build belum terverifikasi)
+## Docker dan Postman terverifikasi pada 10 November
 
-Dockerfile multi-stage, `.dockerignore` allowlist, dan Compose API + migration + PostgreSQL sudah ditambahkan. Compose memakai port host `3001`/`5435` agar berbeda dari native. Validasi Compose dan pemeriksaan runtime production-only pada host lulus. Percobaan build masih gagal sebelum image dibangun karena engine Docker Desktop tidak tersedia. Bukti serta langkah pemulihan aman ada di [panduan Docker](docker.md). Ini mengerjakan bagian packaging dari Task 12; CI dan release gate belum selesai.
+Dockerfile multi-stage kini memasang OpenSSL/CA certificates pada tahap build/migration agar Prisma CLI sesuai dengan Linux. Dua image berhasil dibangun; service database dan API Healthy, migration Exited (0). Port host tetap `3001`/`5435`. Suite 20 tes lulus terhadap PostgreSQL Docker; Newman meluluskan 2 request / 7 assertion. Pemeriksaan runtime membuktikan non-root, root filesystem read-only, Argon2id berfungsi, sembilan model dapat dibaca, serta file secret/tooling development tidak ada pada filesystem API.
+
+Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Environment Docker khusus disediakan dengan secret kosong; request GUI dibiarkan terbuka sebagai tab belum disimpan. Bukti dan perintah ada di [panduan Docker](docker.md). Bagian packaging dari Task 12 terverifikasi; CI, alur bisnis, seed Docker, dan release gate penuh belum selesai.
 
 ## Berikutnya
 

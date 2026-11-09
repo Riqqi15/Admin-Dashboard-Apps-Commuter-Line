@@ -12,6 +12,8 @@
 
 ## Scope and execution rules
 
+Update 10 November 2026: Docker image API/migration berhasil dibangun setelah penambahan OpenSSL; API + PostgreSQL Healthy, migration Exited (0), 20 tes pada database Docker dan 7 assertion Newman lulus. Bagian Docker Task 12 dimajukan dan sudah diuji; CI serta release gate penuh tetap belum selesai. Endpoint readiness juga terlihat 200 OK langsung di Postman. Task 4 (auth username/password tanpa 2FA/PIN/OTP) tetap tahap bisnis berikutnya.
+
 Status eksekusi 9 November 2026: Checkpoint A (Tasks 1–3) selesai secara lokal dengan PostgreSQL 18 native khusus repository; migration, seed berulang, dan integration test sudah terverifikasi. Docker tetap bermasalah, tetapi bukan lagi penghambat database lokal. Health/readiness dari Task 10 dimajukan: Newman menjalankan 2 request / 7 assertion. Rincian bukti dan penyesuaian ada di [progress](../../progress.md). Checkbox langkah asli tetap merujuk workflow awal Docker; status pelaksanaan terkini mengikuti dokumen progress. Task 4 adalah pekerjaan berikutnya.
 
 - Work only inside 'C:\Users\riyadh\Documents\ChatGPT\Admin Dashboard'.

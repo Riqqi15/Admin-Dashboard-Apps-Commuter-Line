@@ -7,7 +7,7 @@ import { seedDemo } from '../../src/lib/seed';
 
 loadEnvFile('.env');
 const url = new URL(process.env.DATABASE_URL!);
-if (url.hostname !== '127.0.0.1' || url.port !== '5434' || url.pathname !== '/timetable_admin') throw new Error('Seed tests require isolated local database');
+if (url.hostname !== '127.0.0.1' || !['5434', '5435'].includes(url.port) || url.pathname !== '/timetable_admin') throw new Error('Seed tests require isolated local database');
 const prisma = createPrisma(url.toString());
 afterAll(() => prisma.$disconnect());
 const credentials = {
