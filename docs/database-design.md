@@ -5,6 +5,7 @@
 - [Source Mermaid](diagrams/timetable-admin-erd.mmd)
 - [Gambar SVG](diagrams/timetable-admin-erd.svg)
 - [Gambar PNG](diagrams/timetable-admin-erd.png)
+- [Legenda simbol dan penjelasan hubungan antartabel](database-design-visual.md#legenda-simbol)
 
 ## 1. ERD
 

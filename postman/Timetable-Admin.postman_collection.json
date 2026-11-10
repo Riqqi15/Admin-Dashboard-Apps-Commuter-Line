@@ -9,7 +9,7 @@
       "name": "01 Health Check",
       "item": [
         {
-          "name": "01 Backend hidup",
+          "name": "Check API Health",
           "request": {
             "method": "GET",
             "header": [
@@ -43,10 +43,10 @@
       ]
     },
     {
-      "name": "01b Database Readiness",
+      "name": "02 Database Readiness",
       "item": [
         {
-          "name": "Database PostgreSQL siap",
+          "name": "Check Database Connection",
           "request": {
             "method": "GET",
             "header": [ { "key": "Accept", "value": "application/json" }, { "key": "Origin", "value": "{{origin}}" } ],
@@ -62,10 +62,10 @@
       ]
     },
     {
-      "name": "02 Authentication",
+      "name": "03 Authentication",
       "item": [
         {
-          "name": "02 Login Super Admin",
+          "name": "Login as Super Admin",
           "request": {
             "method": "POST",
             "header": [
@@ -126,7 +126,7 @@
           ]
         },
         {
-          "name": "03 Profil akun aktif",
+          "name": "Get Current User",
           "request": {
             "method": "GET",
             "header": [
@@ -162,10 +162,10 @@
       ]
     },
     {
-      "name": "03 Stations",
+      "name": "04 Stations",
       "item": [
         {
-          "name": "04 Daftar stasiun",
+          "name": "List Stations",
           "request": {
             "method": "GET",
             "header": [
@@ -201,10 +201,10 @@
       ]
     },
     {
-      "name": "04 Staff Management",
+      "name": "05 Staff Management",
       "item": [
         {
-          "name": "05 Daftar petugas (Super Admin)",
+          "name": "List Staff",
           "request": {
             "method": "GET",
             "header": [
@@ -240,10 +240,10 @@
       ]
     },
     {
-      "name": "05 Camera Session Ingest",
+      "name": "06 Camera Sessions",
       "item": [
         {
-          "name": "06 Buat sesi simulator stasiun A",
+          "name": "Create Camera Session",
           "request": {
             "method": "POST",
             "header": [
@@ -306,7 +306,7 @@
           ]
         },
         {
-          "name": "07 Ulangi sesi identik (idempotency)",
+          "name": "Test Duplicate Session",
           "request": {
             "method": "POST",
             "header": [
@@ -359,10 +359,10 @@
       ]
     },
     {
-      "name": "06 Camera Failure Events",
+      "name": "07 Camera Failure Events",
       "item": [
         {
-          "name": "08 Kegagalan analisis ke-1",
+          "name": "Record Camera Failure (1/3)",
           "request": {
             "method": "POST",
             "header": [
@@ -428,7 +428,7 @@
           ]
         },
         {
-          "name": "09 Kegagalan analisis ke-2",
+          "name": "Record Camera Failure (2/3)",
           "request": {
             "method": "POST",
             "header": [
@@ -494,7 +494,7 @@
           ]
         },
         {
-          "name": "10 Kegagalan analisis ke-3",
+          "name": "Record Camera Failure (3/3)",
           "request": {
             "method": "POST",
             "header": [
@@ -560,7 +560,7 @@
           ]
         },
         {
-          "name": "11 Kirim ulang event ketiga",
+          "name": "Test Duplicate Failure Event",
           "request": {
             "method": "POST",
             "header": [
@@ -613,10 +613,10 @@
       ]
     },
     {
-      "name": "07 Alerts",
+      "name": "08 Alerts",
       "item": [
         {
-          "name": "12 Daftar alert",
+          "name": "List Alerts",
           "request": {
             "method": "GET",
             "header": [
@@ -650,7 +650,7 @@
           ]
         },
         {
-          "name": "13 Detail alert",
+          "name": "Get Alert Details",
           "request": {
             "method": "GET",
             "header": [
@@ -684,7 +684,7 @@
           ]
         },
         {
-          "name": "14 Ambil alert",
+          "name": "Claim Alert",
           "request": {
             "method": "PATCH",
             "header": [
@@ -735,7 +735,7 @@
           ]
         },
         {
-          "name": "15 Selesaikan alert",
+          "name": "Resolve Alert",
           "request": {
             "method": "PATCH",
             "header": [
@@ -788,10 +788,10 @@
       ]
     },
     {
-      "name": "08 Analytics",
+      "name": "09 Analytics",
       "item": [
         {
-          "name": "16 Ringkasan dashboard",
+          "name": "Get Dashboard Summary",
           "request": {
             "method": "GET",
             "header": [
@@ -825,7 +825,7 @@
           ]
         },
         {
-          "name": "17 Statistik penggunaan",
+          "name": "Get Usage Statistics",
           "request": {
             "method": "GET",
             "header": [
@@ -872,10 +872,10 @@
       ]
     },
     {
-      "name": "09 Audit Logs",
+      "name": "10 Audit Logs",
       "item": [
         {
-          "name": "18 Audit log (Super Admin)",
+          "name": "List Audit Logs",
           "request": {
             "method": "GET",
             "header": [
@@ -911,10 +911,10 @@
       ]
     },
     {
-      "name": "10 Security and Negative Tests",
+      "name": "11 Security Tests",
       "item": [
         {
-          "name": "19 Login petugas A",
+          "name": "Login as Station A Security",
           "request": {
             "method": "POST",
             "header": [
@@ -975,7 +975,7 @@
           ]
         },
         {
-          "name": "20 Petugas A membaca alert stasiun A",
+          "name": "Allow Own Station Alert Access",
           "request": {
             "method": "GET",
             "header": [
@@ -1009,7 +1009,7 @@
           ]
         },
         {
-          "name": "21 Petugas A ditolak mengakses daftar staff",
+          "name": "Deny Staff List Access",
           "request": {
             "method": "GET",
             "header": [
@@ -1043,7 +1043,7 @@
           ]
         },
         {
-          "name": "22 Login petugas B",
+          "name": "Login as Station B Security",
           "request": {
             "method": "POST",
             "header": [
@@ -1104,7 +1104,7 @@
           ]
         },
         {
-          "name": "23 Petugas B ditolak membaca alert stasiun A",
+          "name": "Deny Cross-Station Alert Access",
           "request": {
             "method": "GET",
             "header": [
@@ -1138,7 +1138,7 @@
           ]
         },
         {
-          "name": "24 Petugas B ditolak mengubah alert stasiun A",
+          "name": "Deny Cross-Station Alert Update",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1189,7 +1189,7 @@
           ]
         },
         {
-          "name": "25 Logout petugas B",
+          "name": "Logout",
           "request": {
             "method": "POST",
             "header": [
@@ -1228,7 +1228,7 @@
           ]
         },
         {
-          "name": "26 Profil tanpa sesi ditolak",
+          "name": "Deny Unauthenticated Profile Access",
           "request": {
             "method": "GET",
             "header": [
@@ -1262,7 +1262,7 @@
           ]
         },
         {
-          "name": "27 Login salah ditolak",
+          "name": "Reject Invalid Credentials",
           "request": {
             "method": "POST",
             "header": [

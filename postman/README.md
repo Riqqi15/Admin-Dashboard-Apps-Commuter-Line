@@ -14,7 +14,7 @@ Status: **Health Check dan Database Readiness tersedia; endpoint bisnis masih dr
 1. Buka Postman desktop, klik **Import**, lalu pilih kedua file JSON di folder ini.
 2. Pilih Environment **Timetable Admin — Local Example**.
 3. Ikuti setup di README utama: generate Prisma Client, jalankan database/migration, lalu `npm run dev`. Isi `baseUrl` dengan `http://127.0.0.1:3000` (tanpa slash terakhir).
-4. Buka folder **01 Health Check**, pilih **01 Backend hidup**, lalu klik **Send**.
+4. Buka folder **01 Health Check**, pilih **Check API Health**, lalu klik **Send**.
 5. Target: HTTP `200`, JSON `{"success":true,"data":{"status":"ok"}}`, dan empat assertion lulus pada **Test Results**. Jika koneksi ditolak, pastikan backend sudah aktif dan port benar.
 
 Untuk container Docker, impor `Docker.postman_environment.json` dan pilih **Timetable Admin — Docker Example**. `baseUrl` sudah menunjuk `http://127.0.0.1:3001`. Jalankan dua folder health/readiness; padanan otomatisnya `npm run postman:docker`. Request bisnis masih draft.

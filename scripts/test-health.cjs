@@ -4,7 +4,7 @@ const newman = require('newman');
 
 const collection = JSON.parse(readFileSync(resolve(__dirname, '../postman/Timetable-Admin.postman_collection.json'), 'utf8'));
 // Run the real health request from the existing collection; business routes are not implemented yet.
-const health = collection.item.filter(folder => ['01 Health Check', '01b Database Readiness'].includes(folder.name));
+const health = collection.item.filter(folder => ['01 Health Check', '02 Database Readiness'].includes(folder.name));
 if (health.length !== 2) throw new Error('Health / readiness folders are missing');
 const docker = process.argv.includes('--docker');
 newman.run({
