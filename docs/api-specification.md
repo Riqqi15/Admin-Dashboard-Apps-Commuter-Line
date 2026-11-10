@@ -16,7 +16,7 @@ Endpoint di luar base path `/api/v1` yang sudah tersedia:
 | GET | `/health`, `/health/live` | 200, `data.status=ok`; liveness tanpa query database |
 | GET | `/health/ready` | 200, `data.status=ready` dan `data.database=connected` setelah query PostgreSQL; 503 `DATABASE_UNAVAILABLE` bila koneksi gagal |
 
-Endpoint bisnis di bagian berikut masih kontrak desain dan belum diimplementasikan.
+Endpoint authentication, stations, dan staff pada bagian 2-3 sudah diimplementasikan pada Checkpoint B. Ingest, alert, SSE, analytics, dan endpoint audit di bagian berikut masih kontrak desain.
 
 ## 1. Format response
 
@@ -54,6 +54,19 @@ Keputusan scope demo: login hanya membutuhkan `username` dan `password`. Tidak a
 
 Login dibatasi maksimal 5 kegagalan per kombinasi username+IP dan 30 percobaan per IP dalam 15 menit. Response gagal selalu generik.
 
+Kontrak yang sudah tersedia:
+
+- Login menerima JSON ketat `{"username":"...","password":"..."}`. Username di-trim dan dinormalisasi lowercase; field tambahan ditolak. Sukses HTTP 200 dengan `data.user` dan `data.csrfToken`. Token sesi hanya dikirim melalui cookie `admin_session`, bukan JSON/Bearer token.
+- Cookie memakai `HttpOnly`, `SameSite=Strict`, `Path=/api/v1`, serta `Secure` pada production. Sesi memiliki masa berlaku absolut 8 jam; database hanya menyimpan HMAC SHA-256 token sesi dan CSRF, dengan domain hash terpisah.
+- `GET /auth/me` mengembalikan `data` berisi `id`, `username`, `role`, `stationId`, dan `mustChangePassword`. Password/hash/token internal tidak dikirim. CSRF token diperoleh saat login atau ganti sandi; simpan secara lokal pada client, dan login ulang bila token tersebut hilang.
+- `POST /auth/change-password` menerima `{"currentPassword":"...","newPassword":"..."}`. Sandi baru 12-128 karakter, berbeda dari sandi lama. Sukses HTTP 200 dengan `data.user` dan CSRF baru, serta cookie sesi baru. Semua sesi lama dicabut, termasuk cookie sebelum rotasi; masa berlaku absolut sesi yang sedang dipakai tidak diperpanjang.
+- Akun baru/reset memiliki `mustChangePassword=true`. Sebelum mengganti sandi, hanya profil, ganti sandi, dan logout yang dapat digunakan. Endpoint bisnis mengembalikan HTTP 403 `PASSWORD_CHANGE_REQUIRED`.
+- Logout menerima POST tanpa body atau `{}`, membutuhkan cookie dan `X-CSRF-Token`, mencabut sesi, menghapus cookie, dan mengembalikan `data.loggedOut=true` (HTTP 200).
+- Semua mutasi berbasis cookie memerlukan `X-CSRF-Token` dari sesi yang sama. Origin yang dikirim harus tepat sama dengan allowlist; `Sec-Fetch-Site: cross-site` ditolak. Request Postman tanpa Origin tetap memerlukan cookie/CSRF untuk mutasi. Login hanya menerima `application/json`.
+- Sesi yang kedaluwarsa/dicabut atau akun/stasiun yang nonaktif ditolak HTTP 401. Login dengan username tidak dikenal, sandi salah, atau akun/stasiun nonaktif memakai pesan generik yang sama.
+
+**Batas deployment:** rate limit Checkpoint B memakai MemoryStore per proses dan reset ketika proses API dimulai ulang. Jalankan satu instance untuk demo. Deployment multi-instance memerlukan store pembatasan bersama; batas terdistribusi belum dibuktikan.
+
 ## 3. Stations dan staff
 
 | Method | Path | Akses |
@@ -67,6 +80,24 @@ Login dibatasi maksimal 5 kegagalan per kombinasi username+IP dan 30 percobaan p
 | POST | '/staff/:id/reset-password' | Super Admin |
 
 Petugas baru wajib memiliki 'stationId'. Username dinormalisasi lowercase.
+
+Body implementasi saat ini (field tambahan ditolak):
+
+| Endpoint | Body / query | Respons sukses |
+|---|---|---|
+| GET `/stations` | `page` (default 1), `pageSize` (default 20, maksimal 100); `stationId` hanya untuk Super Admin | 200, `data.items`, `total`, `page`, `pageSize` |
+| POST `/stations` | `code` (uppercase setelah normalisasi, 1-20 karakter `A-Z`, angka, `.`, `_`, `-`), `name` (1-120 karakter), `isActive` opsional | 201, `data` stasiun |
+| PATCH `/stations/:id` | Minimal satu dari `code`, `name`, `isActive` | 200, `data` stasiun |
+| GET `/staff` | `page`, `pageSize`, `stationId` opsional; hanya Super Admin | 200, `data.items`, `total`, `page`, `pageSize` |
+| POST `/staff` | `username`, `password` (12-128 karakter), `stationId` aktif | 201, `data` petugas |
+| PATCH `/staff/:id` | Minimal satu dari `username`, `stationId` aktif, `isActive` | 200, `data` petugas |
+| POST `/staff/:id/reset-password` | `newPassword` (12-128 karakter), ditentukan Super Admin | 200, `data` petugas dengan `mustChangePassword=true` |
+
+Staff-management hanya mengelola akun `STATION_SECURITY`. Field `role`, `passwordHash`, dan `mustChangePassword` tidak boleh diatur client. ID akun Super Admin pada route staff mengembalikan scoped 404. Sandi reset tidak dikembalikan oleh API; operator menyimpan sandi yang ia masukkan secara lokal.
+
+Petugas mendapat daftar berisi stasiun dari akun terkini di database, tanpa menerima pilihan scope dari client. Penggunaan query `stationId` oleh petugas ditolak 403, termasuk stationId sendiri. Semua route pengelolaan ditolak 403 untuk petugas. Perubahan akun petugas, reset sandi, serta penonaktifan akun/stasiun mencabut sesi yang terdampak. Pemindahan petugas tidak mengubah stasiun pada riwayat alert. Aktivitas login/logout, ganti sandi, serta mutasi stasiun/staff dicatat ke `audit_logs` dalam transaksi tanpa sandi atau token.
+
+Kesalahan input menghasilkan 400 `VALIDATION_ERROR`, duplikasi menghasilkan 409 `CONFLICT`, dan resource tidak ditemukan menghasilkan 404 `NOT_FOUND`, tanpa detail SQL/constraint. Pengujian isolasi pada Checkpoint B mencakup endpoint stasiun dan pengelolaan petugas; isolasi alert/SSE harus dibuktikan saat fitur tersebut dibuat.
 
 ## 4. Ingest sesi dan event
 

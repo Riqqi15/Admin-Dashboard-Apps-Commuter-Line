@@ -12,21 +12,21 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 
 ## Authentication dan session
 
-- [ ] Password di-hash dengan Argon2id dan parameter yang ditinjau.
-- [ ] Username dinormalisasi dan unik.
-- [ ] Login dibatasi per IP dan username+IP.
-- [ ] Session token acak, disimpan sebagai hash, dan dirotasi setelah login.
-- [ ] Cookie HttpOnly, SameSite, dan Secure pada production.
-- [ ] Logout, reset password, serta deaktivasi akun mencabut sesi.
-- [ ] Error login tidak membedakan username valid/tidak valid.
+- [x] Password di-hash dengan Argon2id (64 MiB, 3 iterasi, paralelisme 1). Bukti: `src/lib/password.ts`, tes seed/auth/staff.
+- [x] Username dinormalisasi dan unik. Bukti: schema Zod, constraint PostgreSQL, tes auth/staff.
+- [x] Login dibatasi per IP dan username+IP. Bukti: `tests/security/auth-abuse.test.ts`; MemoryStore masih untuk satu proses, bukan limit terdistribusi.
+- [x] Session token acak, hanya HMAC disimpan, token baru pada login dan ganti sandi. Bukti: `tests/integration/auth.test.ts`.
+- [x] Cookie HttpOnly, SameSite=Strict, dan Secure pada production. Bukti: tes auth.
+- [x] Logout, reset password, serta deaktivasi akun/stasiun mencabut sesi. Bukti: tes auth/staff dan `tests/security/auth-races.test.ts`.
+- [x] Error login tidak membedakan username valid/tidak valid. Bukti: tes auth.
 
 ## Authorization
 
-Bukti awal database: constraint `admin_users_role_station_check` dan integration test `tests/integration/database.test.ts` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Ini belum membuktikan otorisasi endpoint/BOLA; item di bawah tetap terbuka sampai Task 5.
+Bukti database: constraint `admin_users_role_station_check` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Checkpoint B menambah pemeriksaan role, kewajiban ganti sandi sementara, scope pada query stasiun, serta penolakan endpoint pengelolaan untuk petugas (`tests/security/station-bola.test.ts`). Cakupan alert/SSE tetap terbuka sampai endpoint tersebut dibuat.
 
-- [ ] Pemeriksaan role dilakukan pada backend.
-- [ ] Filter 'station_id' diterapkan pada service/query, bukan hanya controller/UI.
-- [ ] Petugas tidak dapat memilih station scope melalui query parameter.
+- [x] Pemeriksaan role dilakukan pada backend untuk route stasiun/staff yang sudah tersedia.
+- [x] Scope akun terkini diterapkan pada query daftar stasiun melalui `stationScope`; route bisnis berikutnya tetap harus memakai scope serupa.
+- [x] Petugas tidak dapat memilih station scope melalui query parameter pada endpoint stasiun.
 - [ ] SSE difilter berdasarkan role dan stasiun.
 - [ ] Test IDOR/BOLA mencakup read dan write lintas stasiun.
 - [ ] Acknowledge alert atomik dan mencegah double assignment.
@@ -34,7 +34,7 @@ Bukti awal database: constraint `admin_users_role_station_check` dan integration
 ## Input, output, dan injection
 
 - [ ] Semua body, params, query, dan header penting divalidasi dengan schema ketat.
-- [ ] Field tak dikenal ditolak pada endpoint sensitif.
+- [x] Field tak dikenal ditolak pada schema login/ganti sandi, pembuatan/perubahan stasiun/staff dan reset sandi; pengujian mencakup mass assignment.
 - [ ] Ukuran body, panjang string, rentang tanggal, dan pagination dibatasi.
 - [ ] Tidak ada raw SQL dari input pengguna.
 - [ ] Tidak ada eval, shell command, arbitrary URL fetch, atau unsafe redirect.
@@ -42,7 +42,7 @@ Bukti awal database: constraint `admin_users_role_station_check` dan integration
 
 ## CSRF, CORS, dan HTTP
 
-- [ ] Mutasi berbasis cookie memakai CSRF token dan pemeriksaan Origin.
+- [x] Mutasi berbasis cookie yang tersedia memakai token CSRF sesi dan pemeriksaan Origin/Sec-Fetch-Site. Bukti: `tests/security/auth-abuse.test.ts` dan `station-bola.test.ts`.
 - [x] CORS memakai allowlist tanpa wildcard credentials. Bukti: `src/http/security.ts`, `tests/security/http-baseline.test.ts`.
 - [ ] Helmet dan CSP disetel sesuai deployment.
 - [x] Header x-powered-by dinonaktifkan. Bukti: `src/app.ts`, `tests/security/http-baseline.test.ts`.
@@ -62,7 +62,7 @@ Bukti awal database: constraint `admin_users_role_station_check` dan integration
 ## PII, logging, dan error
 
 - [ ] Nama dan telepon dienkripsi pada penyimpanan.
-- [x] Password, cookie, token, secret, dan telepon lengkap diredaksi dari log HTTP dasar melalui metadata allowlist. Bukti: `src/http/request-context.ts`, `tests/security/http-baseline.test.ts`. Audit/domain logging belum tersedia dan tetap perlu diverifikasi ketika dibuat.
+- [x] Password, cookie, token, secret, dan telepon lengkap diredaksi dari log HTTP dasar melalui metadata allowlist. Bukti: `src/http/request-context.ts`, `tests/security/http-baseline.test.ts`. Audit auth/stasiun/staff menyimpan action dan ID saja; tes reset sandi memeriksa tidak ada plaintext. Audit fitur berikutnya tetap perlu diverifikasi.
 - [ ] Error client generik; detail tersedia hanya pada log aman.
 - [ ] PII dianonimkan setelah 7 hari.
 - [ ] Alert dan audit log dihapus setelah 30 hari.

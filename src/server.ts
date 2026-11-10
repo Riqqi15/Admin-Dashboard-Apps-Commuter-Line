@@ -7,7 +7,7 @@ import { createLogger } from './http/request-context';
 try {
   const config = parseEnv(process.env);
   const prisma = createPrisma(config.DATABASE_URL);
-  const server = createServer(createApp(config, createLogger(config), () => prisma.$queryRaw`SELECT 1`));
+  const server = createServer(createApp(config, createLogger(config), () => prisma.$queryRaw`SELECT 1`, prisma));
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   server.keepAliveTimeout = 5_000;

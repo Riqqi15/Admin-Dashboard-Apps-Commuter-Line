@@ -1,4 +1,4 @@
-import { argon2id, hash } from 'argon2';
+import { hashPassword } from './password';
 import { z } from 'zod';
 import type { PrismaClient } from '../generated/prisma/client';
 
@@ -20,7 +20,7 @@ export async function seedDemo(client: SeedClient, input: Record<string, string 
     if (!existing) {
       await client.adminUser.create({ data: {
         username, role, stationId, mustChangePassword: true,
-        passwordHash: await hash(plaintext, { type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1 }),
+        passwordHash: await hashPassword(plaintext),
       } });
     }
     return client.adminUser.findUniqueOrThrow({ where: { username }, select: { id: true, username: true, role: true, stationId: true } });

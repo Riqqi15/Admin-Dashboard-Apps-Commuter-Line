@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Timetable Admin API — DRAFT",
-    "description": "Starter pengujian backend capstone. Endpoint health sudah diimplementasikan dan diuji melalui Newman; endpoint bisnis masih draft. Endpoint mengikuti docs/api-specification.md; asumsi schema/header dicatat di postman/README.md. Jalankan alur penuh hanya setelah backend bisnis dan fixture siap.",
+    "description": "Health, authentication, stations and staff management are implemented (Checkpoint B). Camera ingest, alerts, analytics and audit-list endpoints remain draft. Use npm run postman:admin for the isolated authentication/administration workflow. Do not run the full collection until the remaining routes are implemented.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -49,15 +49,32 @@
           "name": "Check Database Connection",
           "request": {
             "method": "GET",
-            "header": [ { "key": "Accept", "value": "application/json" }, { "key": "Origin", "value": "{{origin}}" } ],
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
             "url": "{{baseUrl}}/health/ready",
             "description": "Memeriksa koneksi PostgreSQL melalui query SELECT 1. HTTP 503 bila database tidak tersedia."
           },
-          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "pm.test('Database ready: HTTP 200', () => pm.response.to.have.status(200));",
-            "pm.test('Readiness JSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
-            "pm.test('PostgreSQL terhubung', () => pm.expect(pm.response.json()).to.eql({success:true,data:{status:'ready',database:'connected'}}));"
-          ] } } ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Database ready: HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Readiness JSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+                  "pm.test('PostgreSQL terhubung', () => pm.expect(pm.response.json()).to.eql({success:true,data:{status:'ready',database:'connected'}}));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -83,7 +100,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/auth/login",
-            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "description": "Implemented. Opaque admin_session cookie is managed by Postman; data.csrfToken is captured automatically. Accounts with mustChangePassword=true can only access me/change-password/logout.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{superAdminUsername}}\",\n  \"password\": \"{{superAdminPassword}}\"\n}",
@@ -120,6 +137,55 @@
                   "  pm.test(\"Login mengembalikan CSRF token\", () => pm.expect(token).to.be.a(\"string\").and.not.empty);",
                   "  if (typeof token === \"string\" && token) pm.environment.set(\"csrfToken\", token);",
                   "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/auth/change-password",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{currentPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 200) pm.environment.set(\"csrfToken\", pm.response.json().data.csrfToken);",
+                  "pm.test(\"Temporary password cleared\", () => pm.expect(pm.response.json().data.user.mustChangePassword).to.eql(false));"
                 ]
               }
             }
@@ -197,6 +263,101 @@
               }
             }
           ]
+        },
+        {
+          "name": "Create Station",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/stations",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{managedStationCode}}\",\n  \"name\": \"{{managedStationName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 201) pm.environment.set(\"managedStationId\", pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Station",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/stations/{{managedStationId}}",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{managedStationUpdatedName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -218,7 +379,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/staff",
-            "description": "Akun dummy petugas A dan B disiapkan melalui seed backend; endpoint create belum memiliki schema body final dalam spesifikasi."
+            "description": "Implemented. Super Admin only; response data.items contains station-security accounts, without password hashes. Pagination: page/pageSize; optional stationId filter."
           },
           "event": [
             {
@@ -232,6 +393,150 @@
                   "  pm.expect(json.success).to.eql(true);",
                   "  pm.expect(json).to.have.property(\"data\");",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{managedStaffUsername}}\",\n  \"password\": \"{{managedStaffPassword}}\",\n  \"stationId\": \"{{managedStationId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "if (pm.response.code === 201) pm.environment.set(\"managedStaffId\", pm.response.json().data.id);",
+                  "pm.test(\"One station and fixed security role\", () => { const u = pm.response.json().data; pm.expect(u.role).to.eql(\"STATION_SECURITY\"); pm.expect(u.stationId).to.eql(pm.environment.get(\"managedStationId\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Staff",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff/{{managedStaffId}}",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Staff Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff/{{managedStaffId}}/reset-password",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"{{managedStaffResetPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Temporary password required after reset\", () => pm.expect(pm.response.json().data.mustChangePassword).to.eql(true));"
                 ]
               }
             }
@@ -1303,6 +1608,67 @@
                   "  pm.expect(json.success).to.eql(false);",
                   "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Require Temporary Password Change",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/stations",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(false));",
+                  "pm.test(\"Password change required\", () => pm.expect(pm.response.json().error.code).to.eql(\"PASSWORD_CHANGE_REQUIRED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deny Station Scope Override",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/stations?stationId={{otherStationId}}",
+            "description": "Implemented in Checkpoint B. Use fixture/demo data only."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"JSON response\", () => pm.expect(pm.response.json().success).to.eql(false));"
                 ]
               }
             }

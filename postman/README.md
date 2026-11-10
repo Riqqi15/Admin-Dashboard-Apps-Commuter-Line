@@ -1,90 +1,84 @@
 # Pengujian API dengan Postman
 
-Status: **Health Check dan Database Readiness tersedia; endpoint bisnis masih draft**. Server lokal memiliki `/health`, `/health/live`, dan `/health/ready`. Newman menjalankan dua request ke backend nyata; 26 request bisnis menunggu implementasi auth/alert. Database, migration dan seed demo sudah tersedia. File ini mengikuti [API specification](../docs/api-specification.md).
+Status Checkpoint B: **health, authentication, stations, dan staff management tersedia**. Collection berisi 36 request dalam 11 folder: 20 request untuk endpoint yang sudah diimplementasikan, 16 request ingest/alert/analytics/audit yang masih draft. Keberhasilan workflow di bawah tidak membuktikan fitur yang masih draft.
 
-## File
+## File dan impor
 
-- `Timetable-Admin.postman_collection.json`: 28 request dalam 11 folder (termasuk readiness).
-- `Local.postman_environment.json`: contoh Environment tanpa kredensial.
-- `Docker.postman_environment.json`: contoh Environment tanpa kredensial untuk API Docker pada port 3001.
-- `validate.cjs`: pemeriksaan struktur, variabel, dan sintaks script secara offline.
+- `Timetable-Admin.postman_collection.json`: Collection utama, termasuk request ganti sandi dan pengelolaan stasiun/staff.
+- `Local.postman_environment.json`: contoh Environment native, `baseUrl=http://127.0.0.1:3000`.
+- `Docker.postman_environment.json`: contoh Environment Docker, `baseUrl=http://127.0.0.1:3001`.
+- `validate.cjs`: validasi struktur, variabel, sintaks script, dan secret contoh secara offline.
 
-## Impor dan percobaan pertama
+Impor Collection dan salah satu Environment melalui **Import**, lalu pilih Environment di kanan atas. Jika Collection lama sudah ada, pilih **Replace** dan periksa tidak ada duplikat. File JSON dalam repo yang diperbarui tidak otomatis memperbarui salinan di aplikasi Postman.
 
-1. Buka Postman desktop, klik **Import**, lalu pilih kedua file JSON di folder ini.
-2. Pilih Environment **Timetable Admin — Local Example**.
-3. Ikuti setup di README utama: generate Prisma Client, jalankan database/migration, lalu `npm run dev`. Isi `baseUrl` dengan `http://127.0.0.1:3000` (tanpa slash terakhir).
-4. Buka folder **01 Health Check**, pilih **Check API Health**, lalu klik **Send**.
-5. Target: HTTP `200`, JSON `{"success":true,"data":{"status":"ok"}}`, dan empat assertion lulus pada **Test Results**. Jika koneksi ditolak, pastikan backend sudah aktif dan port benar.
+Untuk native, jalankan database/migration sesuai README utama, lalu `npm run dev`. Docker memerlukan engine yang aktif dan image terbaru melalui `npm run docker:up`. Image sebelum Checkpoint B hanya memiliki health/readiness.
 
-Untuk container Docker, impor `Docker.postman_environment.json` dan pilih **Timetable Admin — Docker Example**. `baseUrl` sudah menunjuk `http://127.0.0.1:3001`. Jalankan dua folder health/readiness; padanan otomatisnya `npm run postman:docker`. Request bisnis masih draft.
+## Tes otomatis tanpa memasukkan sandi manual
 
-Alternatif otomatis: jalankan `npm run postman:health` di terminal lain. Perintah ini menjalankan Health Check dan Database Readiness: 2 request, 7 assertion. Readiness memerlukan PostgreSQL aktif; liveness tidak. Hindari Run seluruh Collection sampai endpoint bisnis tersedia.
+Setelah dependency, Prisma Client, database lokal, dan migration siap:
 
-Cara impor: [dokumentasi resmi Postman](https://learning.postman.com/docs/getting-started/importing-and-exporting/importing-data/).
-Cara kerja assertion: [dokumentasi script Postman](https://learning.postman.com/docs/tests-and-scripts/write-scripts/test-scripts/).
+~~~powershell
+npm run postman:validate
+npm run postman:admin
+~~~
 
-## Persiapan alur lengkap (sesudah backend selesai)
+`postman:validate` tidak mengirim request. `postman:admin` otomatis menjalankan build, membuka server HTTP nyata pada port loopback sementara, dan memakai PostgreSQL lokal proyek dari `.env` (hanya port 5434/5435 dan database `timetable_admin`). Script menolak mode production.
 
-Jalankan `npm run setup:demo` lalu `npm run prisma:seed`: dua stasiun demo, akun `superadmin`, `security.manggarai`, dan `security.tanahabang` dibuat. Sandi acak berada di `.env.seed.local`; akun baru wajib mengganti sandi ketika implementasi auth tersedia. Collection bisnis masih draft dan tidak membuat akun/stasiun.
+Workflow menjalankan **22 request / 55 assertion** dari Collection utama, meliputi:
 
-Isi Environment secara lokal:
+1. Health dan database readiness.
+2. Login Super Admin dengan sandi sementara, ganti sandi, dan profil.
+3. Daftar/buat/ubah stasiun.
+4. Daftar/buat/ubah petugas dan reset sandi.
+5. Logout admin lalu login sebagai petugas yang baru dibuat.
+6. Penolakan akses bisnis sebelum sandi sementara diganti.
+7. Ganti sandi petugas dan daftar yang hanya berisi stasiunnya.
+8. Penolakan pemilihan scope stasiun dan akses pengelolaan staff.
+9. Logout, penolakan profil tanpa sesi, dan login dengan sandi salah.
 
-| Variabel | Isi |
+Kredensial acak hanya berada di memori; cookie dikelola Newman. Fixture memakai prefix acak per run, lalu akun/stasiun/sesi/audit fixture dibersihkan. Akun demo tidak diubah dan Environment contoh tidak diisi secret. Tidak perlu menyalin sandi atau token ke terminal.
+
+Runner otomatis memilih folder 01-05 dan request auth/otorisasi tertentu. Jangan menjalankan seluruh Collection karena fitur kamera/alert belum tersedia.
+
+## Mencoba manual di Postman
+
+Untuk akun demo, jalankan `npm run setup:demo` dan `npm run prisma:seed` jika belum tersedia. Sandi awal ada di `.env.seed.local`; seed ulang tidak mengganti sandi akun yang sudah ada. Isi kredensial hanya di Environment lokal/private.
+
+| Variabel | Keterangan |
 |---|---|
-| `superAdminUsername`, `superAdminPassword` | Kredensial Super Admin demo |
+| `superAdminUsername`, `superAdminPassword` | Kredensial Super Admin |
 | `stationSecurityUsername`, `stationSecurityPassword` | Kredensial petugas stasiun A |
 | `otherStationSecurityUsername`, `otherStationSecurityPassword` | Kredensial petugas stasiun B |
-| `stationId`, `otherStationId` | UUID stasiun A dan B dari database/GET stations |
-| `ingestKey` | Key simulator lokal dari konfigurasi backend |
+| `currentPassword`, `newPassword` | Sandi akun yang sedang login dan sandi penggantinya (12-128 karakter) |
+| `managedStationCode`, `managedStationName`, `managedStationUpdatedName` | Data stasiun uji; kode harus unik |
+| `managedStationId` | Otomatis diisi setelah Create Station |
+| `managedStaffUsername`, `managedStaffPassword` | Username unik dan sandi sementara petugas uji |
+| `managedStaffId` | Otomatis diisi setelah Create Staff |
+| `managedStaffResetPassword` | Sandi sementara baru untuk Reset Staff Password |
+| `managedStaffNewPassword` | Dipakai workflow otomatis saat petugas mengganti sandi sementara |
+| `stationId`, `otherStationId` | UUID stasiun untuk fixture dan tes scope |
+| `csrfToken` | Otomatis diisi setelah login/ganti sandi; tidak diisi manual |
 
-Biarkan cookie jar Postman aktif. Login memakai cookie sesi, bukan Bearer token. Respons login menyimpan CSRF token ke Environment. Logout mencabut sesi terakhir.
+Urutan awal: **Check API Health -> Check Database Connection -> Login as Super Admin -> Change Password -> Get Current User -> List Stations**. Setelah ganti sandi, perbarui variabel sandi akun terkait agar login berikutnya memakai sandi terbaru. CSRF baru disimpan otomatis dan cookie lama tidak berlaku.
 
-Jalankan request **01–12** secara berurutan. Request 06 menghasilkan UUID sesi dan waktu baru; request 07 mengulang payload sesi identik. Request 08–10 mengirim tiga kegagalan analisis dengan event ID berbeda. Request 11 mengirim ulang payload event ketiga, bukan membuat ID baru. Kirim seluruh event dalam jendela 5 menit.
+Akun dengan `mustChangePassword=true` hanya dapat memakai profil, ganti sandi, dan logout; daftar stasiun/staff akan menolak sampai sandi diganti. Untuk akun yang sudah mengganti sandi, request Change Password tidak wajib dijalankan lagi.
 
-Sebelum request 13, pastikan `alertId` terisi. Jika endpoint event mengembalikan `data.alertId`, script menyimpannya otomatis. Jika tidak, dari request 12 cari alert dengan sesi request 06 lalu salin UUID alert ke `alertId`. Jangan mengambil alert pengguna lain.
+Cookie jar harus aktif. Login memakai `admin_session`, bukan Bearer token. Mutasi memerlukan `X-CSRF-Token` milik sesi aktif; saat mengganti akun, lakukan login lagi untuk memperbarui cookie/CSRF. Token CSRF hilang berarti perlu login ulang.
 
-Request 14 dan 15 mengubah status alert demo. Request 19–27 mengganti akun aktif untuk memeriksa batas role/stasiun, lalu logout dan menguji akses tanpa sesi. Untuk mengulang seluruh alur, mulai dari login Super Admin dan buat sesi baru melalui request 06.
+Request **Require Temporary Password Change** sengaja mengharapkan 403 pada akun bersandi sementara. Request **Deny Station Scope Override** sengaja dijalankan sebagai petugas, bukan Super Admin. Request pengelolaan stasiun/staff dijalankan sebagai Super Admin yang sudah mengganti sandi.
 
-Setelah setup berhasil, gunakan Collection Runner. Run pertama lebih mudah dilakukan satu per satu agar respons bisa dipahami. Jangan mengulang request 06 di tengah skenario: UUID sesi berubah.
+## Bagian yang masih draft
 
-## Asumsi draft yang perlu diselaraskan dengan implementasi
+Folder Camera Sessions, Camera Failure Events, Alerts, Analytics, dan Audit Logs belum memiliki backend. Tes negatif akses alert lintas stasiun juga belum dapat dijalankan. Jangan memakai hasil 403 endpoint stasiun sebagai bukti isolasi alert/SSE.
 
-Spesifikasi belum menentukan seluruh schema body/response, nama cookie, header ingest, dan status sukses. Collection menggunakan:
+Variabel `ingestKey`, `externalSessionId`, `eventId`, `alertId`, serta kontrak response ingest/claim/resolve masih mengikuti desain dan akan diselaraskan pada implementasi berikutnya. Foto/video kamera tidak dikirim atau disimpan.
 
-- `POST /auth/login`: body `username` dan `password`; HTTP 200; CSRF token di `data.csrfToken`. Nama field token dapat diubah melalui `csrfResponseField`.
-- Header mutasi berbasis cookie: `X-CSRF-Token`, dapat diubah melalui `csrfHeader`.
-- Header simulator: `X-Ingest-Key`, dapat diubah melalui `ingestKeyHeader`. Hanya untuk simulator development.
-- `PATCH /alerts/:id/resolve`: body `{"notes":"..."}`; field ini perlu dikonfirmasi saat implementasi.
-- Login/logout dan mutasi alert: HTTP 200 dengan envelope `success/data`. Ingest sesi menerima 200/201; ingest event menerima 200/201/202 sampai status final disepakati.
-- `GET /health` berada di luar `/api/v1`; sudah ditetapkan dan memeriksa HTTP 200, Content-Type JSON, body liveness, serta header nosniff.
+## Batas bukti dan keamanan
 
-Ini asumsi Collection, bukan penetapan kontrak API baru. Sesuaikan request/assertion dengan OpenAPI final sebelum menjadikannya release gate. Jika implementasi logout menggunakan HTTP 204, ubah assertion dan jangan mencoba mem-parse body kosong.
+Integration/security tests memeriksa cookie production, sesi hash-only, CSRF, rate limit, revokasi akun/stasiun, mass assignment, dan request bersamaan. Newman memeriksa alur HTTP nyata dan isi daftar stasiun. Frontend, integrasi mobile, retensi, alert, dan deployment production belum dibuktikan.
 
-## Cakupan dan batas bukti
+Rate limit memakai MemoryStore satu proses; restart menghapus counter, sehingga deployment multi-instance memerlukan shared store. Pengujian Docker Checkpoint B belum dijalankan ketika Docker Desktop dijeda; native PostgreSQL tetap dapat dipakai.
 
-Assertions memeriksa status HTTP dan envelope JSON, ditambah keberadaan CSRF token pada login. Tes negatif memeriksa larangan akses staff untuk petugas, akses baca/tulis alert antarstasiun, akses setelah logout, dan sandi salah.
+Environment contoh harus selalu kosong dari secret. File `*.private.postman_environment.json` diabaikan Git. Jangan membagikan ekspor berisi sandi, cookie, atau token.
 
-**Tetap periksa secara manual:** dua kegagalan awal belum membuat alert, kegagalan ketiga membuat tepat satu alert, replay tidak menduplikasi sesi/event/alert, status berubah sesuai aturan, serta isi data hanya dari stasiun yang diizinkan. Respons HTTP sukses saja tidak membuktikan aturan tersebut.
-
-Reset melalui ANALYSIS_RECOVERED, kegagalan inisialisasi kamera, CSRF negatif, balapan acknowledge, retensi, dan SSE belum dicakup Collection awal ini. Rincian tetap ada di [test plan](../docs/test-plan.md). Lulus Collection ini belum berarti seluruh backend atau keamanannya lulus.
-
-## Verifikasi file dan Newman
-
-Dari root repository, setelah dependency yang sudah tercantum terpasang:
-
-```powershell
-node postman/validate.cjs
-```
-
-Ini hanya memvalidasi file secara offline; tidak mengirim request.
-
-Setelah backend dan data demo siap, ekspor Environment lokal yang sudah diisi ke `postman/Local.private.postman_environment.json`, lalu:
-
-```powershell
-npx --no-install newman run postman/Timetable-Admin.postman_collection.json -e postman/Local.private.postman_environment.json --bail
-```
-
-Run penuh hanya setelah semua variabel termasuk `alertId` dapat diperoleh sesuai kontrak implementasi; bila respons event belum mengembalikan ID alert, jalankan tahap 01–12 dahulu, salin ID, lalu lanjutkan tahap berikut melalui Postman.
-
-Environment contoh harus tetap kosong dari secret. File `*.private.postman_environment.json` diabaikan Git; jangan ekspor kredensial nyata ke file contoh atau membagikan cookie/CSRF token.
+Referensi: [kontrak API](../docs/api-specification.md), [progres](../docs/progress.md), [impor Postman](https://learning.postman.com/docs/getting-started/importing-and-exporting/importing-data/).

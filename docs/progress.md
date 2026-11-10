@@ -1,5 +1,23 @@
 # Progress backend — 10 November 2026
 
+## Checkpoint B: authentication, stasiun, dan petugas
+
+Tasks 4-5 sudah diimplementasikan pada branch `backend-auth-stations`, setelah Checkpoint A digabung ke `main`. Tidak ada 2FA/PIN/OTP.
+
+- Endpoint login username/sandi, profil, logout, dan ganti sandi tersedia. Argon2id dipakai bersama oleh seed dan akun baru. Cookie sesi opaque berumur absolut 8 jam; hanya HMAC sesi/CSRF disimpan di database.
+- Login menerapkan limit 5 kegagalan username+IP dan 30 percobaan/IP per 15 menit. Store limit masih per proses untuk demo satu instance; restart menghapus counter.
+- CSRF, flag cookie, sesi kedaluwarsa/dicabut, akun/stasiun nonaktif, dan kewajiban ganti sandi pertama diuji. Ganti sandi merotasi cookie/CSRF tanpa memperpanjang masa berlaku absolut sesi.
+- Super Admin dapat membuat/mengubah stasiun, membuat/mengubah/menonaktifkan petugas, serta reset sandi. Client tidak dapat mengatur role/hash/flag internal. List memakai pagination maksimal 100 baris.
+- Petugas hanya membaca stasiun penugasannya dari akun terkini; pemilihan scope melalui query dan semua endpoint pengelolaan ditolak. Pemindahan akun mencabut sesi tanpa menulis ulang stasiun riwayat alert.
+- Penguncian transaksi mengikuti urutan stasiun -> akun -> sesi -> audit. Uji request bersamaan memeriksa login setelah reset/rename, logout saat ganti sandi, dan penonaktifan stasiun saat reset.
+- Verifikasi lokal: **41 tes pada 10 file lulus**, TypeScript dan build lulus. Lima tes request bersamaan memakai barrier password/query serta observasi lock PostgreSQL; pengujian bukan hanya status HTTP.
+- Audit login/logout, ganti sandi, serta mutasi stasiun/staff disimpan tanpa password/token. Endpoint pembacaan audit dan worker retensi belum tersedia.
+- Collection diperbarui menjadi **36 request / 44 script / 2 Environment**: 20 request untuk endpoint tersedia, 16 request lanjutan masih draft. `npm run postman:admin` menjalankan **22 request HTTP nyata / 55 assertion** menggunakan fixture acak dan port loopback sementara, lalu membersihkannya. File Environment contoh tetap tanpa secret; akun demo tidak diubah oleh workflow.
+
+Docker Desktop sedang dijeda pada saat pengembangan Checkpoint B. Pengujian memakai PostgreSQL native khusus proyek pada port 5434; image Docker Checkpoint B belum dibangun ulang. Build dan pengujian Docker pada catatan Checkpoint A di bawah adalah bukti untuk versi sebelumnya.
+
+Untuk sesi pengembangan ini, API Checkpoint B dijalankan di `http://127.0.0.1:3002`. Port 3000 masih melayani proses versi sebelumnya. Environment lokal tanpa secret disiapkan di `.local/Checkpoint-B.postman_environment.json` (diabaikan Git); Collection di repo perlu diimpor ulang untuk menampilkan request baru. Port default pada contoh konfigurasi tetap 3000; port 3002 adalah override runtime sesi ini.
+
 ## Checkpoint A: fondasi, database, dan HTTP baseline
 
 Task 1–3 sudah diimplementasikan dan diverifikasi secara lokal. Liveness/readiness dari Task 10 dimajukan agar koneksi API–database dapat diuji melalui Postman. Backend bisnis belum tersedia.
@@ -47,10 +65,10 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Task 4: login username/sandi, sesi cookie, CSRF, rate limit, ganti sandi, dan revokasi sesi.
-- Task 5: manajemen stasiun/staff dan pengujian isolasi stasiun (Checkpoint B).
-- Tasks 6–12: ingest, alert, SSE, analytics/audit/retensi, simulator/OpenAPI, acceptance penuh, CI dan release gate.
+- Task 6: ingest sesi/event kamera dengan validasi station confirmation, idempotency, dan replay window.
+- Task 7: alert kegagalan kamera serta claim/resolve dengan scope stasiun dan uji race.
+- Tasks 8-12: SSE, analytics/audit/retensi, simulator/OpenAPI, acceptance penuh, CI dan release gate.
 
-Tidak ada endpoint data pengguna yang dibuka pada tahap ini. Repository Timetable milik dosen tidak diubah. Progres sampai commit `3db0258` sudah dipush ke branch `codex/backend-foundation`; perubahan Docker sesudahnya masih lokal.
+Endpoint tracking pengguna, ingest, dan alert belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; branch lama sudah dihapus. Perubahan Checkpoint B masih lokal sampai ada instruksi push berikutnya.
 
 Lihat [README](../README.md) untuk perintah setup, serta [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).

@@ -30,13 +30,13 @@ for (const environment of environments) {
     assert(match[1].startsWith("$") || keys.has(match[1]), "Variabel belum didefinisikan: " + match[1]);
   }
   for (const variable of environment.values) {
-    if (/Password$|Token$|^ingestKey$/.test(variable.key)) {
+    if (variable.type === "secret" || /Password$|Token$|^ingestKey$/.test(variable.key)) {
       assert.equal(variable.value, "", "Secret contoh harus kosong: " + variable.key);
     }
   }
 }
 assert.equal(collection.info.schema, "https://schema.getpostman.com/json/collection/v2.1.0/collection.json");
 assert.equal(sdk.items.count(), collection.item.length);
-assert.equal(requests, 28);
+assert.equal(requests, 36);
 console.log("PASS: " + requests + " requests, " + scripts + " scripts, " + environments.length + " environments; SDK import, variables, syntax, and blank example secrets.");
 console.log("Offline validation only; this command does not test backend responses.");
