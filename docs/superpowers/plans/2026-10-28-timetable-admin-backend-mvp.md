@@ -12,6 +12,8 @@
 
 ## Scope and execution rules
 
+Update 17 November 2026: Tasks 6–7 tersedia lokal pada `backend-camera-alerts`: simulator ingest, enkripsi PII, idempotency/replay, ambang kegagalan, REST alert sesuai scope, claim/resolve dan audit atomik. Suite 59 tes/16 file serta Newman kamera 22 request/64 assertion lulus. Acknowledge memakai row lock diikuti pemeriksaan NEW untuk serialisasi klaim. Task 8 (SSE) menjadi berikutnya; Checkpoint C penuh belum selesai. Bukti serta batas worker retensi/Docker dicatat pada [progress](../../progress.md).
+
 Update Checkpoint B, 10 November 2026: Tasks 4-5 diimplementasikan pada branch `backend-auth-stations`, memakai username/sandi tanpa 2FA/PIN/OTP. Route auth dan pengelolaan stasiun/staff memiliki integration/security tests; Newman Checkpoint B menjalankan 22 request nyata / 55 assertion. Store rate limit masih per proses; image Docker terbaru belum dibangun karena Desktop dijeda. Lihat [progress](../../progress.md) dan kontrak body terbaru di [API specification](../../api-specification.md). Task 6 (ingest) adalah pekerjaan berikutnya. Checkbox asli tetap merekam urutan rencana awal; bukti checkpoint mengikuti progress.
 
 Update 10 November 2026: Docker image API/migration berhasil dibangun setelah penambahan OpenSSL; API + PostgreSQL Healthy, migration Exited (0), 20 tes pada database Docker dan 7 assertion Newman lulus. Bagian Docker Task 12 dimajukan dan sudah diuji; CI serta release gate penuh tetap belum selesai. Endpoint readiness juga terlihat 200 OK langsung di Postman. Task 4 (auth username/password tanpa 2FA/PIN/OTP) tetap tahap bisnis berikutnya.

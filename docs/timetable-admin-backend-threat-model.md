@@ -2,7 +2,17 @@
 
 ## Executive summary
 
-Risiko terbesar berasal dari API yang dapat diakses internet: pengambilalihan akun admin, broken access control lintas stasiun, event ingest palsu yang memicu dispatch petugas, kebocoran PII melalui response/log/SSE, serta denial of service pada endpoint login, ingest, dan koneksi SSE. Checkpoint B telah mengimplementasikan auth dan pengelolaan stasiun/staff; bukti lokal dicatat pada kontrol terkait. Ingest, alert, SSE, analytics, retensi, dan deployment internet tetap belum dibuktikan.
+Risiko terbesar berasal dari API yang dapat diakses internet: pengambilalihan akun admin, broken access control lintas stasiun, event ingest palsu yang memicu dispatch petugas, kebocoran PII melalui response/log/SSE, serta denial of service pada endpoint login, ingest, dan koneksi SSE. Auth dan stasiun/staff tersedia sejak Checkpoint B. Pada 17 November, ingest simulator dan REST alert sudah memiliki bukti lokal; SSE, analytics, worker retensi dan deployment internet belum dibuktikan.
+
+## Kontrol yang dibuktikan 17 November 2026
+
+- Trust boundary simulator: `X-Ingest-Key` development/test, digest constant-time, 60 request/menit per sumber/IP, validasi ketat dan larangan media. Source MOBILE/production tidak dibuka; key simulator menolak akses sesi MOBILE. Key yang bocor tetap dapat mengirim simulasi palsu sehingga API development harus tetap loopback.
+- Replay/race: fingerprint HMAC terpisah sesi/event, UUID lowercase, advisory lock global ID, row lock sesi, jendela +/-5 menit, serta penolakan urutan waktu mundur. Tes paralel mencakup ID sama lintas sesi/stasiun, counter tanpa duplikasi dan satu alert per sesi.
+- Authorization: list/detail/claim/resolve mengambil scope dari akun terkini, menyembunyikan resource lintas stasiun dengan 404, dan membaca ulang sesi setelah account lock. Tes barrier membuktikan revokasi/pemindahan akun sebelum klaim tidak dapat dilewati. Klaim bersamaan hanya menghasilkan satu handler; resolve memerlukan handler/Super Admin dan catatan.
+- PII: AES-256-GCM dengan IV acak serta AAD per record/field; snapshot alert terpisah dari profil terkini. Ciphertext tidak dikirim ke client; nama/telepon hanya pada detail yang sah, disembunyikan setelah 7 hari. TTL belum menghapus data fisik karena worker belum dibuat; backup/key rotation juga belum dibuktikan.
+- Audit pembuatan/claim/resolve atomik dengan transaksi, tanpa snapshot nama/telepon. Event/pemulihan kamera tidak menutup alert otomatis. Sistem hanya membuat alert API; dispatch telepon/SMS atau UI real-time belum tersedia.
+
+Bukti: `tests/integration/ingest.test.ts`, `alerts.test.ts`, `alert-race.test.ts`, `tests/security/ingest-abuse.test.ts`, `tests/unit/pii.test.ts`, serta workflow `npm run postman:camera`.
 
 ## Scope and assumptions
 

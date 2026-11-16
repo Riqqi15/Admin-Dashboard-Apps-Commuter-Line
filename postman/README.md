@@ -1,6 +1,6 @@
 # Pengujian API dengan Postman
 
-Status Checkpoint B: **health, authentication, stations, dan staff management tersedia**. Collection berisi 36 request dalam 11 folder: 20 request untuk endpoint yang sudah diimplementasikan, 16 request ingest/alert/analytics/audit yang masih draft. Keberhasilan workflow di bawah tidak membuktikan fitur yang masih draft.
+Status 17 November 2026: **health, authentication, stations, staff, ingest simulator dan REST alert tersedia**. Collection berisi 36 request dalam 11 folder: 33 request tersedia, 3 request analytics/audit masih draft. SSE dan worker retensi belum tersedia.
 
 ## File dan impor
 
@@ -20,6 +20,7 @@ Setelah dependency, Prisma Client, database lokal, dan migration siap:
 ~~~powershell
 npm run postman:validate
 npm run postman:admin
+npm run postman:camera
 ~~~
 
 `postman:validate` tidak mengirim request. `postman:admin` otomatis menjalankan build, membuka server HTTP nyata pada port loopback sementara, dan memakai PostgreSQL lokal proyek dari `.env` (hanya port 5434/5435 dan database `timetable_admin`). Script menolak mode production.
@@ -38,7 +39,25 @@ Workflow menjalankan **22 request / 55 assertion** dari Collection utama, melipu
 
 Kredensial acak hanya berada di memori; cookie dikelola Newman. Fixture memakai prefix acak per run, lalu akun/stasiun/sesi/audit fixture dibersihkan. Akun demo tidak diubah dan Environment contoh tidak diisi secret. Tidak perlu menyalin sandi atau token ke terminal.
 
-Runner otomatis memilih folder 01-05 dan request auth/otorisasi tertentu. Jangan menjalankan seluruh Collection karena fitur kamera/alert belum tersedia.
+`postman:admin` memilih folder 01-05 dan request auth/otorisasi tertentu. `postman:camera` memilih workflow kamera di bawah. Jangan menjalankan seluruh Collection karena analytics/audit belum tersedia.
+
+## Workflow kamera sampai bantuan selesai
+
+`npm run postman:camera` membangun source dan menjalankan **22 request HTTP nyata / 64 assertion** melalui Newman:
+
+1. Health, database, login dan profil Super Admin.
+2. Buat sesi simulator dan ulangi payload yang sama: ID sesi tetap sama.
+3. Kirim kegagalan analisis pertama/kedua: counter bertambah, belum ada alert.
+4. Kirim kegagalan ketiga: satu alert dibuat; ulangi event yang sama tanpa menaikkan counter.
+5. Baca daftar/detail, logout lalu login petugas stasiun A.
+6. Petugas A mengambil alert lalu menyelesaikannya dengan catatan.
+7. Petugas B ditolak saat membaca atau mengubah alert stasiun A (404).
+
+Runner memakai key ingest serta kredensial acak di memori, port loopback sementara dan fixture sendiri. Sesi kamera/event/alert/pengguna fixture ikut dihapus setelah run; akun demo dan Environment pengguna tidak diubah.
+
+Manual: isi `ingestKey` dari `SIMULATOR_INGEST_KEY` dalam `.env` hanya pada Environment private/lokal; `stationId` harus UUID stasiun aktif yang benar. Mulai **Create Camera Session -> Test Duplicate Session -> Record Camera Failure (1/3), (2/3), (3/3) -> Test Duplicate Failure Event -> List Alerts -> Get Alert Details -> Claim Alert -> Resolve Alert**. Login sebagai petugas stasiun sesi sebelum claim/resolve; `alertId` dan CSRF terisi otomatis. Akun bersandi sementara harus mengganti sandi lebih dahulu. Jendela waktu ingest +/-5 menit: mulai sesi baru jika percobaan sudah terlalu lama.
+
+`CAMERA_INIT_FAILED` memicu alert langsung; tiga langkah di Collection mendemonstrasikan ambang `ANALYSIS_FAILED`. Recovery mereset counter, tetapi tidak menyelesaikan alert. Foto/video tidak dikirim.
 
 ## Mencoba manual di Postman
 
@@ -69,13 +88,13 @@ Request **Require Temporary Password Change** sengaja mengharapkan 403 pada akun
 
 ## Bagian yang masih draft
 
-Folder Camera Sessions, Camera Failure Events, Alerts, Analytics, dan Audit Logs belum memiliki backend. Tes negatif akses alert lintas stasiun juga belum dapat dijalankan. Jangan memakai hasil 403 endpoint stasiun sebagai bukti isolasi alert/SSE.
+Folder Analytics dan Audit Logs masih draft. SSE, integrasi mobile production, dan worker penghapusan belum tersedia. Tes isolasi alert REST sudah dijalankan; hasil tersebut belum membuktikan SSE.
 
-Variabel `ingestKey`, `externalSessionId`, `eventId`, `alertId`, serta kontrak response ingest/claim/resolve masih mengikuti desain dan akan diselaraskan pada implementasi berikutnya. Foto/video kamera tidak dikirim atau disimpan.
+Collection utama bernama **Timetable Admin API**, tanpa label DRAFT untuk fitur yang sudah tersedia. Impor ulang Collection agar salinan aplikasi menerima perubahan; pertahankan Environment private yang sudah diisi. Contoh Environment dalam Git tetap tanpa sandi/key.
 
 ## Batas bukti dan keamanan
 
-Integration/security tests memeriksa cookie production, sesi hash-only, CSRF, rate limit, revokasi akun/stasiun, mass assignment, dan request bersamaan. Newman memeriksa alur HTTP nyata dan isi daftar stasiun. Frontend, integrasi mobile, retensi, alert, dan deployment production belum dibuktikan.
+Integration/security tests memeriksa cookie production, sesi hash-only, CSRF, rate limit, revokasi akun/stasiun, mass assignment, ingest idempotent, enkripsi PII, ambang kegagalan, isolasi REST alert, dan klaim bersamaan. Frontend, integrasi mobile, SSE, penghapusan retensi, dan deployment production belum dibuktikan.
 
 Rate limit memakai MemoryStore satu proses; restart menghapus counter, sehingga deployment multi-instance memerlukan shared store. Pengujian Docker Checkpoint B belum dijalankan ketika Docker Desktop dijeda; native PostgreSQL tetap dapat dipakai.
 

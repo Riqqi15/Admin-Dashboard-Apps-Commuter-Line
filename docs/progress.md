@@ -1,4 +1,19 @@
-# Progress backend — 10 November 2026
+# Progress backend — 17 November 2026
+
+## Ingest kamera dan REST alert: Tasks 6–7
+
+Implementasi lokal berada pada branch `backend-camera-alerts`, melanjutkan auth/stasiun. Checkpoint C penuh belum selesai karena Task 8 (SSE) masih berikutnya.
+
+- Simulator menerima sesi dengan stasiun aktif yang dikonfirmasi, serta lima jenis event kamera. Media/field tambahan, timestamp di luar +/-5 menit, event mundur, dan event baru sesudah sesi ditutup ditolak. Production/MOBILE belum diaktifkan.
+- Key simulator diverifikasi constant-time, dengan batas 60 request/menit per sumber/IP. UUID dinormalisasi sebelum fingerprint HMAC dan advisory lock. ID sama dengan payload identik tidak menambah data/counter; payload berbeda menghasilkan 409, termasuk request paralel lintas sesi/stasiun.
+- Gagal inisialisasi kamera membuat alert segera; tiga kegagalan analisis berturut-turut membuat satu alert. Recovery mereset counter tanpa menyelesaikan alert; SESSION_ENDED menutup sesi tanpa menutup alert. Satu sesi tetap maksimal satu alert.
+- List/detail/claim/resolve menerapkan scope stasiun dari akun terkini. Klaim bersamaan menghasilkan satu handler; penyelesaian memerlukan handler/Super Admin dan catatan. Sesi dibaca ulang dalam transaksi untuk menolak akses yang sudah dicabut atau akun yang dipindahkan.
+- Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD per record/field; snapshot alert dienkripsi terpisah. Daftar tidak memuat PII; detail menyembunyikan PII sesudah 7 hari. TTL 7/30 hari ditulis tetapi worker penghapusan fisik belum dibuat.
+- Pembuatan, klaim, dan penyelesaian alert mencatat audit tanpa snapshot PII dalam transaksi yang sama. Belum ada panggilan/SMS atau tampilan dashboard real-time.
+- Verifikasi: **59 tes pada 16 file lulus**, typecheck/build lulus. Newman kamera **22 request / 64 assertion**, regresi auth/stasiun **22 request / 55 assertion**. Collection **36 request / 44 script / 2 Environment**; 33 request tersedia, 3 analytics/audit masih draft. Seluruh kredensial/key pengujian acak hanya di memori dan fixture dibersihkan.
+- API specification, threat model, checklist keamanan, test plan, README dan panduan Postman diselaraskan dengan implementasi. Tidak ada perubahan schema/migration baru pada tahap ini.
+
+API source terbaru dijalankan secara native di `http://127.0.0.1:3002`, PostgreSQL proyek di port 5434. Default konfigurasi tetap 3000. Docker image tahap ini belum dibangun/dijalankan ulang. File Collection harus diimpor ulang ke aplikasi Postman; Environment private yang sudah diisi tetap dipertahankan.
 
 ## Checkpoint B: authentication, stasiun, dan petugas
 
@@ -65,10 +80,10 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Task 6: ingest sesi/event kamera dengan validasi station confirmation, idempotency, dan replay window.
-- Task 7: alert kegagalan kamera serta claim/resolve dengan scope stasiun dan uji race.
-- Tasks 8-12: SSE, analytics/audit/retensi, simulator/OpenAPI, acceptance penuh, CI dan release gate.
+- Task 8: SSE untuk notifikasi alert sesuai stasiun, tanpa PII dan dengan revokasi koneksi saat sesi/akses dicabut.
+- Task 9: analytics, pembacaan audit, dan worker retensi 7/30 hari.
+- Tasks 10-12: CLI simulator/OpenAPI, acceptance penuh, CI dan release gate.
 
-Endpoint tracking pengguna, ingest, dan alert belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; branch lama sudah dihapus. Perubahan Checkpoint B masih lokal sampai ada instruksi push berikutnya.
+Endpoint ingest simulator dan REST alert tersedia secara lokal; integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; perubahan auth dan kamera/alert berikutnya masih lokal sampai ada instruksi push.
 
 Lihat [README](../README.md) untuk perintah setup, serta [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).

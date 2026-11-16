@@ -1,5 +1,16 @@
 # Test Plan — Timetable Admin Backend
 
+## Bukti lokal 17 November 2026
+
+- `npm test`: 59 tes pada 16 file, termasuk auth/stasiun, ingest, crypto PII, REST alert dan race.
+- `npm run postman:camera`: 22 request HTTP / 64 assertion. Ambang gagal 1–3, replay identik, detail sesuai scope, claim/resolve serta penolakan lintas stasiun.
+- `npm run postman:admin`: regresi 22 request HTTP / 55 assertion.
+- `npm run postman:validate`: 36 request / 44 script / 2 Environment, secret contoh kosong.
+- Race ingest mencakup UUID berbeda casing, ID event sama lintas sesi, event paralel, counter dan satu alert. Race alert mencakup dua claimant dan pencabutan/pemindahan akun setelah middleware autentikasi.
+- Crypto memeriksa roundtrip, IV acak, key/AAD salah dan manipulasi tag. Detail menguji snapshot tidak mengikuti perubahan profil serta penekanan PII setelah 7 hari.
+
+Daftar skenario berikut tetap menjadi target acceptance lengkap. SSE, worker penghapusan, analytics, OpenAPI, dan deployment Docker terbaru belum dibuktikan oleh hasil di atas.
+
 ## 1. Tujuan
 
 Membuktikan aturan bisnis, isolasi stasiun, keamanan API, konsistensi transaksi, retensi data, dan kontrak response sebelum backend dianggap selesai.

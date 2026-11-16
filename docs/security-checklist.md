@@ -22,7 +22,7 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 
 ## Authorization
 
-Bukti database: constraint `admin_users_role_station_check` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Checkpoint B menambah pemeriksaan role, kewajiban ganti sandi sementara, scope pada query stasiun, serta penolakan endpoint pengelolaan untuk petugas (`tests/security/station-bola.test.ts`). Cakupan alert/SSE tetap terbuka sampai endpoint tersebut dibuat.
+Bukti database: constraint `admin_users_role_station_check` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Checkpoint B menambah pemeriksaan role dan scope stasiun/staff. Implementasi 17 November menambah isolasi REST alert dan revalidasi sesi dalam transaksi (`tests/integration/alerts.test.ts`, `alert-race.test.ts`). SSE tetap belum tersedia.
 
 - [x] Pemeriksaan role dilakukan pada backend untuk route stasiun/staff yang sudah tersedia.
 - [x] Scope akun terkini diterapkan pada query daftar stasiun melalui `stationScope`; route bisnis berikutnya tetap harus memakai scope serupa.
@@ -52,16 +52,16 @@ Bukti database: constraint `admin_users_role_station_check` mencegah akun petuga
 
 ## Ingest dan replay protection
 
-- [ ] 'event_id' dan 'external_session_id' unik.
-- [ ] Timestamp lama/terlalu jauh di masa depan ditolak.
-- [ ] Request duplikat idempotent; payload berbeda untuk ID sama ditolak.
-- [ ] Simulator key hanya tersedia pada development.
+- [x] 'event_id' dan 'external_session_id' unik; UUID dinormalisasi dan advisory lock melindungi ID baru. Bukti: `tests/integration/ingest.test.ts`.
+- [x] Timestamp di luar +/-5 menit, termasuk replay duplikat, ditolak. Event sebelum sesi/event terakhir ditolak. Bukti: `tests/security/ingest-abuse.test.ts`.
+- [x] Request duplikat idempotent; payload berbeda untuk ID sama ditolak, termasuk lintas sesi/stasiun. Bukti: tes ingest.
+- [x] Simulator key hanya tersedia pada development/test; production dan MOBILE belum dibuka. Perbandingan digest constant-time. Bukti: `src/features/ingest/ingest-auth.ts`, tes ingest-abuse/env.
 - [ ] Kredensial production tidak ditanam dalam mobile/frontend bundle.
-- [ ] Rate limit dan monitoring diterapkan pada ingest.
+- [x] Rate limit ingest 60/menit per sumber+IP dan log metadata tersedia; belum ada monitoring/alert operasional deployment. Bukti: tes ingest-abuse dan HTTP baseline. Store masih per proses.
 
 ## PII, logging, dan error
 
-- [ ] Nama dan telepon dienkripsi pada penyimpanan.
+- [x] Nama/telepon terenkripsi AES-256-GCM, IV acak, AAD per record/field; snapshot alert dienkripsi terpisah. Bukti: `tests/unit/pii.test.ts`, tes ingest/alerts. Detail menyembunyikan PII berumur 7 hari; penghapusan fisik masih terbuka di bawah.
 - [x] Password, cookie, token, secret, dan telepon lengkap diredaksi dari log HTTP dasar melalui metadata allowlist. Bukti: `src/http/request-context.ts`, `tests/security/http-baseline.test.ts`. Audit auth/stasiun/staff menyimpan action dan ID saja; tes reset sandi memeriksa tidak ada plaintext. Audit fitur berikutnya tetap perlu diverifikasi.
 - [ ] Error client generik; detail tersedia hanya pada log aman.
 - [ ] PII dianonimkan setelah 7 hari.

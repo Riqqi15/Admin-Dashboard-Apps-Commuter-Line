@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Timetable Admin API — DRAFT",
-    "description": "Health, authentication, stations and staff management are implemented (Checkpoint B). Camera ingest, alerts, analytics and audit-list endpoints remain draft. Use npm run postman:admin for the isolated authentication/administration workflow. Do not run the full collection until the remaining routes are implemented.",
+    "name": "Timetable Admin API",
+    "description": "Checkpoint C: health, authentication, stations, staff, simulator camera ingest and station-scoped alerts are implemented. Analytics and audit listing remain draft. Run npm run postman:admin or npm run postman:camera for isolated real HTTP workflows. Do not run the full Collection: draft requests remain.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -570,7 +570,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/ingest/sessions",
-            "description": "Membuat data dummy dan UUID baru setiap Send. Header ingest key masih asumsi draft; lihat README.",
+            "description": "Simulator development/test only. Requires X-Ingest-Key. Generates a fresh UUID and timestamp; confirms the selected active station. No mobile integration is enabled.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"externalUserId\": \"capstone-demo-user\",\n  \"displayName\": \"Pengguna Demo\",\n  \"phone\": \"081234567890\",\n  \"stationId\": \"{{stationId}}\",\n  \"stationConfirmed\": true,\n  \"startedAt\": \"{{sessionStartedAt}}\",\n  \"source\": \"SIMULATOR\"\n}",
@@ -599,12 +599,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.environment.set(\"cameraSessionId\", pm.response.json().data.id);"
                 ]
               }
             }
@@ -633,7 +630,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/ingest/sessions",
-            "description": "Jalankan sesudah 06. Menggunakan UUID dan waktu yang sama. Tes awal hanya memeriksa status/response; verifikasi tidak ada duplikasi tetap diperlukan.",
+            "description": "Send immediately after Create Camera Session. Identical UUID/payload returns the same session without creating another row. Requests older than 5 minutes must start a new session.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"externalUserId\": \"capstone-demo-user\",\n  \"displayName\": \"Pengguna Demo\",\n  \"phone\": \"081234567890\",\n  \"stationId\": \"{{stationId}}\",\n  \"stationConfirmed\": true,\n  \"startedAt\": \"{{sessionStartedAt}}\",\n  \"source\": \"SIMULATOR\"\n}",
@@ -650,12 +647,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201\", () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Same session ID\", () => pm.expect(pm.response.json().data.id).to.eql(pm.environment.get(\"cameraSessionId\")));"
                 ]
               }
             }
@@ -689,7 +683,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/ingest/events",
-            "description": "Kegagalan ini belum boleh memicu alert; cek daftar alert secara manual sebelum melanjutkan.",
+            "description": "Accepted failure increments the consecutive counter; no alert yet.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
@@ -717,16 +711,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});",
-                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "  const data = pm.response.json().data;",
-                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
-                  "}"
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                "const eventResult = pm.response.json().data;",
+                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(1));",
+                "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
                 ]
               }
             }
@@ -755,7 +744,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/ingest/events",
-            "description": "Kegagalan ini belum boleh memicu alert; cek daftar alert secara manual sebelum melanjutkan.",
+            "description": "Accepted failure increments the consecutive counter; no alert yet.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
@@ -783,16 +772,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});",
-                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "  const data = pm.response.json().data;",
-                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
-                  "}"
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                "const eventResult = pm.response.json().data;",
+                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(2));",
+                "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
                 ]
               }
             }
@@ -821,7 +805,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/ingest/events",
-            "description": "Kegagalan ketiga seharusnya menghasilkan satu alert NEW. Jika response berisi data.alertId, nilainya disimpan otomatis. Jika tidak, ambil alertId dari daftar alert.",
+            "description": "Third consecutive analysis failure creates exactly one alert. The alert UUID is saved automatically.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"externalSessionId\": \"{{externalSessionId}}\",\n  \"type\": \"ANALYSIS_FAILED\",\n  \"errorCode\": \"VISION_TIMEOUT\",\n  \"occurredAt\": \"{{occurredAt}}\"\n}",
@@ -849,16 +833,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});",
-                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
-                  "  const data = pm.response.json().data;",
-                  "  if (data && typeof data.alertId === \"string\") pm.environment.set(\"alertId\", data.alertId);",
-                  "}"
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                "const eventResult = pm.response.json().data;",
+                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(3));",
+                "pm.test(\"Alert created\", () => pm.expect(eventResult.alertId).to.be.a(\"string\").and.not.empty);",
+                "pm.environment.set(\"alertId\", eventResult.alertId);"
                 ]
               }
             }
@@ -904,12 +884,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200 / 201 / 202\", () => pm.expect(pm.response.code).to.be.oneOf([200,201,202]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Counter unchanged\", () => pm.expect(pm.response.json().data.consecutiveFailures).to.eql(3));",
+                  "pm.test(\"Same alert\", () => pm.expect(pm.response.json().data.alertId).to.eql(pm.environment.get(\"alertId\")));"
                 ]
               }
             }
@@ -935,7 +913,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/alerts",
-            "description": "Cari alert sesi externalSessionId dari request 06. Salin UUID alert itu ke alertId jika belum terisi otomatis; pastikan hanya satu alert NEW."
+            "description": "Paginated list scoped on the server to the current station. Personal name/phone are returned only by authorized alert detail."
           },
           "event": [
             {
@@ -943,12 +921,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Alert is listed\", () => pm.expect(pm.response.json().data.items.some(a => a.id === pm.environment.get(\"alertId\"))).to.eql(true));",
+                  "pm.test(\"No ciphertext in list\", () => pm.expect(pm.response.text()).not.to.include(\"Ciphertext\"));"
                 ]
               }
             }
@@ -977,12 +953,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Authorized passenger snapshot\", () => pm.expect(pm.response.json().data.user.displayName).to.eql(\"Pengguna Demo\"));"
                 ]
               }
             }
@@ -1028,12 +1001,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Claimed by current account\", () => { const d=pm.response.json().data; pm.expect(d.status).to.eql(\"ACKNOWLEDGED\"); pm.expect(d.assignedToId).to.be.a(\"string\").and.not.empty; });"
                 ]
               }
             }
@@ -1062,7 +1032,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/alerts/{{alertId}}/resolve",
-            "description": "Field notes adalah asumsi draft karena schema resolve belum ditentukan. Gunakan alert ACKNOWLEDGED.",
+            "description": "Requires ACKNOWLEDGED status and nonblank notes (1-1000 characters). Only the assigned handler or Super Admin may resolve.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"notes\": \"Simulasi capstone: pengguna telah dibantu petugas.\"\n}",
@@ -1079,12 +1049,9 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
-                  "});"
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Resolved with note\", () => { const d=pm.response.json().data; pm.expect(d.status).to.eql(\"RESOLVED\"); pm.expect(d.resolutionNote).to.be.a(\"string\").and.not.empty; });"
                 ]
               }
             }
@@ -1237,7 +1204,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/auth/login",
-            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "description": "Cookie session authentication. Successful login saves data.csrfToken. Use only local fixture/demo credentials.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{stationSecurityUsername}}\",\n  \"password\": \"{{stationSecurityPassword}}\"\n}",
@@ -1366,7 +1333,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/auth/login",
-            "description": "Menggunakan cookie sesi, bukan Bearer token. Draft mengasumsikan token di data.csrfToken; ubah csrfResponseField jika kontrak implementasi berbeda. Cookie dikelola otomatis oleh Postman.",
+            "description": "Cookie session authentication. Successful login saves data.csrfToken. Use only local fixture/demo credentials.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"{{otherStationSecurityUsername}}\",\n  \"password\": \"{{otherStationSecurityPassword}}\"\n}",
@@ -1431,12 +1398,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 403 / 404\", () => pm.expect(pm.response.code).to.be.oneOf([403,404]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(false);",
-                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
-                  "});"
+                  "pm.test(\"Cross-station resource hidden\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Safe error\", () => pm.expect(pm.response.json().success).to.eql(false));"
                 ]
               }
             }
@@ -1482,12 +1445,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 403 / 404\", () => pm.expect(pm.response.code).to.be.oneOf([403,404]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(false);",
-                  "  pm.expect(json.error.code).to.be.a(\"string\").and.not.empty;",
-                  "});"
+                  "pm.test(\"Cross-station resource hidden\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Safe error\", () => pm.expect(pm.response.json().success).to.eql(false));"
                 ]
               }
             }

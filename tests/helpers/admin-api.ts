@@ -14,7 +14,7 @@ export async function adminFixture() {
   const prefix = 'test.' + randomUUID().slice(0, 8);
   const databaseUrl = new URL(process.env.DATABASE_URL!);
   databaseUrl.searchParams.set('application_name', prefix);
-  const config = parseEnv({ ...process.env, DATABASE_URL: databaseUrl.toString(), NODE_ENV: 'test', LOG_LEVEL: 'silent' });
+  const config = parseEnv({ ...process.env, DATABASE_URL: databaseUrl.toString(), NODE_ENV: 'test', LOG_LEVEL: 'silent', SIMULATOR_INGEST_KEY: 'fixture-ingest-key-' + randomUUID() });
   const target = new URL(config.DATABASE_URL);
   if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin') {
     throw new Error('API fixtures require the isolated capstone database');
@@ -39,6 +39,12 @@ export async function adminFixture() {
       // Delete only UUID-owned fixture rows, never seed/demo or unrelated project data.
       const stationIds = (await db.station.findMany({ where: { code: { startsWith: prefix.toUpperCase() } }, select: { id: true } })).map(s => s.id);
       const userIds = (await db.adminUser.findMany({ where: { username: { startsWith: prefix } }, select: { id: true } })).map(u => u.id);
+      const trackedIds = (await db.trackedUser.findMany({ where: { externalUserId: { startsWith: prefix } }, select: { id: true } })).map(u => u.id);
+      const cameraIds = (await db.cameraSession.findMany({ where: { stationId: { in: stationIds } }, select: { id: true } })).map(s => s.id);
+      await db.alert.deleteMany({ where: { stationId: { in: stationIds } } });
+      await db.cameraEvent.deleteMany({ where: { cameraSessionId: { in: cameraIds } } });
+      await db.cameraSession.deleteMany({ where: { id: { in: cameraIds } } });
+      await db.trackedUser.deleteMany({ where: { id: { in: trackedIds } } });
       await db.auditLog.deleteMany({ where: { OR: [{ actorAdminUserId: { in: userIds } }, { stationId: { in: stationIds } }] } });
       await db.adminSession.deleteMany({ where: { adminUserId: { in: userIds } } });
       await db.adminUser.deleteMany({ where: { id: { in: userIds } } });
