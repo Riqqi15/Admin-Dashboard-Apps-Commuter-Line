@@ -10,6 +10,10 @@ import { assertAlertTransition } from './alert-state';
 import type { alertQuery } from './alert.schema';
 
 const notFound = () => new AppError(404, 'NOT_FOUND', 'Resource not found');
+// Same response as notFound so existence never leaks; carries the alert's station for the audit trail.
+class CrossStationDenied extends AppError {
+  constructor(readonly alertStationId: string) { super(404, 'NOT_FOUND', 'Resource not found'); }
+}
 const publicSelect = {
   id: true, cameraSessionId: true, stationId: true, failureType: true, errorCode: true,
   status: true, assignedToId: true, resolutionNote: true, createdAt: true,
@@ -39,11 +43,23 @@ async function accessibleAlert(tx: Prisma.TransactionClient, auth: AuthContext, 
   const actor = await currentActor(tx, auth, candidate.stationId);
   await tx.$queryRaw`SELECT id FROM alerts WHERE id = ${id}::uuid FOR UPDATE`;
   const alert = await tx.alert.findUnique({ where: { id } });
-  if (!alert || alert.expiresAt <= new Date() || (actor.role === 'STATION_SECURITY' && actor.stationId !== alert.stationId)) throw notFound();
+  if (!alert || alert.expiresAt <= new Date()) throw notFound();
+  if (actor.role === 'STATION_SECURITY' && actor.stationId !== alert.stationId) throw new CrossStationDenied(alert.stationId);
   return { actor, alert };
 }
 
 export function alertService(db: PrismaClient, config: Env) {
+  // The failed transaction rolls back, so the denial is recorded on its own afterwards.
+  async function guarded<T>(auth: AuthContext, id: string, run: () => Promise<T>) {
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof CrossStationDenied) {
+        await db.$transaction(tx => recordAudit(tx, auth.userId, 'ALERT_ACCESS_DENIED', 'alert', id, error.alertStationId));
+      }
+      throw error;
+    }
+  }
   return {
     async list(auth: AuthContext, query: z.infer<typeof alertQuery>) {
       return db.$transaction(async tx => {
@@ -56,7 +72,7 @@ export function alertService(db: PrismaClient, config: Env) {
       });
     },
     async detail(auth: AuthContext, id: string) {
-      return db.$transaction(async tx => {
+      return guarded(auth, id, () => db.$transaction(async tx => {
         const { alert } = await accessibleAlert(tx, auth, id);
         const visible = !alert.piiPurgedAt && alert.createdAt.getTime() + 7 * 86400000 > Date.now() && alert.userNameCiphertext;
         const user = visible ? {
@@ -64,10 +80,10 @@ export function alertService(db: PrismaClient, config: Env) {
           phone: alert.userPhoneCiphertext ? decryptPii(alert.userPhoneCiphertext, config.PII_ENCRYPTION_KEY, `alert:${alert.id}:phone`) : null,
         } : null;
         return { ...metadata(alert), user };
-      });
+      }));
     },
     async acknowledge(auth: AuthContext, id: string) {
-      return db.$transaction(async tx => {
+      return guarded(auth, id, () => db.$transaction(async tx => {
         const { actor, alert } = await accessibleAlert(tx, auth, id);
         if (alert.status !== 'NEW') throw new AppError(409, 'ALERT_ALREADY_ACKNOWLEDGED', 'Alert has already been claimed');
         const updated = await tx.alert.update({ where: { id }, data: { status: 'ACKNOWLEDGED', assignedToId: actor.userId, acknowledgedAt: new Date() }, select: publicSelect });
@@ -84,10 +100,10 @@ export function alertService(db: PrismaClient, config: Env) {
           update: { averageResponseSeconds: aggregate?.averageResponseSeconds ?? null },
         });
         return updated;
-      });
+      }));
     },
     async resolve(auth: AuthContext, id: string, notes: string) {
-      return db.$transaction(async tx => {
+      return guarded(auth, id, () => db.$transaction(async tx => {
         const { actor, alert } = await accessibleAlert(tx, auth, id);
         assertAlertTransition(alert.status, 'RESOLVED');
         if (actor.role !== 'SUPER_ADMIN' && alert.assignedToId !== actor.userId) throw new AppError(403, 'FORBIDDEN', 'Only the assigned handler can resolve this alert');
@@ -95,7 +111,7 @@ export function alertService(db: PrismaClient, config: Env) {
         await recordAudit(tx, actor.userId, 'ALERT_RESOLVED', 'alert', id, alert.stationId);
         await incrementDailyUsage(tx, alert.stationId, updated.resolvedAt!, { resolvedAlertCount: 1 });
         return updated;
-      });
+      }));
     },
   };
 }
