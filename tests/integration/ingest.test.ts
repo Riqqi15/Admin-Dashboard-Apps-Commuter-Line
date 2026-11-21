@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { adminFixture } from '../helpers/admin-api';
 import { ingestEvent, ingestSession, sessionPayload } from '../helpers/camera-api';
+import { expectError } from '../helpers/expect-error';
 
 let f: Awaited<ReturnType<typeof adminFixture>>;
 beforeAll(async () => { f = await adminFixture(); });
@@ -21,9 +22,25 @@ describe('Camera session/event ingest', () => {
     const duplicate = await ingestSession(f, payload);
     expect(duplicate.status).toBe(200);
     expect(duplicate.body.data.id).toBe(created.body.data.id);
-    expect((await ingestSession(f, { ...payload, displayName: 'Changed Passenger' })).status).toBe(409);
-    expect((await ingestSession(f, { ...payload, stationConfirmed: false })).status).toBe(400);
-    expect((await ingestSession(f, { ...payload, externalSessionId: randomUUID(), stationId: randomUUID() })).status).toBe(404);
+    expectError(await ingestSession(f, { ...payload, displayName: 'Changed Passenger' }), 409, 'IDEMPOTENCY_CONFLICT');
+    expectError(await ingestSession(f, { ...payload, stationConfirmed: false }), 400, 'VALIDATION_ERROR');
+    expectError(await ingestSession(f, { ...payload, externalSessionId: randomUUID(), stationId: randomUUID() }), 404, 'NOT_FOUND');
+  });
+
+  it('rejects events for an expired session (410) and for a session whose station was deactivated (400)', async () => {
+    const expired = sessionPayload(f);
+    expect((await ingestSession(f, expired)).status).toBe(201);
+    await f.db.cameraSession.update({ where: { externalSessionId: expired.externalSessionId }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    expectError(await ingestEvent(f, expired.externalSessionId), 410, 'SESSION_EXPIRED');
+
+    const inactive = sessionPayload(f, { stationId: f.stationB.id });
+    expect((await ingestSession(f, inactive)).status).toBe(201);
+    await f.db.station.update({ where: { id: f.stationB.id }, data: { isActive: false } });
+    try {
+      expectError(await ingestEvent(f, inactive.externalSessionId), 400, 'STATION_INACTIVE');
+    } finally {
+      await f.db.station.update({ where: { id: f.stationB.id }, data: { isActive: true } });
+    }
   });
 
   it('reconciles parallel identical and conflicting session IDs across stations', async () => {
@@ -60,7 +77,7 @@ describe('Camera session/event ingest', () => {
     const ended = await ingestEvent(f, payload.externalSessionId, 'SESSION_ENDED');
     expect(ended.status).toBe(201);
     expect((await f.db.alert.findUniqueOrThrow({ where: { id: third.body.data.alertId } })).status).toBe('NEW');
-    expect((await ingestEvent(f, payload.externalSessionId)).status).toBe(409);
+    expectError(await ingestEvent(f, payload.externalSessionId), 409, 'SESSION_CLOSED');
   });
 
   it('canonicalizes UUID casing and protects a global event ID across different sessions', async () => {
@@ -93,6 +110,6 @@ describe('Camera session/event ingest', () => {
     const repeated = await Promise.all([ingestEvent(f, payload.externalSessionId, 'ANALYSIS_FAILED', { eventId, occurredAt }), ingestEvent(f, payload.externalSessionId, 'ANALYSIS_FAILED', { eventId, occurredAt })]);
     expect(repeated.map(result => result.status).sort()).toEqual([200, 201]);
     expect((await f.db.cameraSession.findUniqueOrThrow({ where: { id: created.body.data.id } })).consecutiveFailures).toBe(5);
-    expect((await ingestEvent(f, payload.externalSessionId, 'ANALYSIS_RECOVERED', { eventId, occurredAt })).status).toBe(409);
+    expectError(await ingestEvent(f, payload.externalSessionId, 'ANALYSIS_RECOVERED', { eventId, occurredAt }), 409, 'IDEMPOTENCY_CONFLICT');
   });
 });

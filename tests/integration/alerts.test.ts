@@ -2,6 +2,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { adminFixture } from '../helpers/admin-api';
 import { alertFixture, ingestSession, sessionPayload } from '../helpers/camera-api';
+import { expectError } from '../helpers/expect-error';
 
 let f: Awaited<ReturnType<typeof adminFixture>>;
 beforeAll(async () => { f = await adminFixture(); });
@@ -22,14 +23,14 @@ describe('Station-scoped alert lifecycle', () => {
     expect(detail.status).toBe(200);
     expect(detail.body.data.user).toEqual({ displayName: 'Fixture Passenger', phone: '081234567890' });
     expect(detail.text).not.toMatch(/Ciphertext|passwordHash|tokenHash/);
-    expect((await request(f.app).get('/api/v1/alerts/' + alertA.alertId).set('Cookie', b.cookie)).status).toBe(404);
-    expect((await request(f.app).get('/api/v1/alerts?stationId=' + f.stationA.id).set('Cookie', b.cookie)).status).toBe(403);
+    expectError(await request(f.app).get('/api/v1/alerts/' + alertA.alertId).set('Cookie', b.cookie), 404, 'NOT_FOUND');
+    expectError(await request(f.app).get('/api/v1/alerts?stationId=' + f.stationA.id).set('Cookie', b.cookie), 403, 'FORBIDDEN');
     for (const action of ['acknowledge', 'resolve']) {
       const denied = await request(f.app).patch('/api/v1/alerts/' + alertB.alertId + '/' + action).set('Cookie', a.cookie).set('X-CSRF-Token', a.csrf).send(action === 'resolve' ? { notes: 'Not allowed' } : {});
-      expect(denied.status).toBe(404);
+      expectError(denied, 404, 'NOT_FOUND');
       expect(denied.text).not.toContain('Fixture Passenger');
     }
-    expect((await request(f.app).get('/api/v1/alerts/' + alertA.alertId)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/alerts/' + alertA.alertId), 401, 'UNAUTHENTICATED');
   });
 
   it('requires claim before resolution, a nonblank note, and the assigned handler or Super Admin', async () => {
@@ -39,19 +40,19 @@ describe('Station-scoped alert lifecycle', () => {
     const peerUser = await f.db.adminUser.create({ data: { username: f.prefix + '.peer', passwordHash: f.admin.passwordHash, role: 'STATION_SECURITY', stationId: f.stationA.id, mustChangePassword: false } });
     const peer = await f.login(peerUser.username);
     const mutate = (action: string, auth: typeof handler, body: object) => request(f.app).patch('/api/v1/alerts/' + fixture.alertId + '/' + action).set('Cookie', auth.cookie).set('X-CSRF-Token', auth.csrf).send(body);
-    expect((await mutate('resolve', handler, { notes: 'Premature resolution' })).status).toBe(422);
-    expect((await mutate('acknowledge', handler, { assignedToId: f.admin.id })).status).toBe(400);
+    expectError(await mutate('resolve', handler, { notes: 'Premature resolution' }), 422, 'INVALID_STATE_TRANSITION');
+    expectError(await mutate('acknowledge', handler, { assignedToId: f.admin.id }), 400, 'VALIDATION_ERROR');
     const claimed = await mutate('acknowledge', handler, {});
     expect(claimed.status).toBe(200);
     expect(claimed.body.data).toMatchObject({ status: 'ACKNOWLEDGED', assignedToId: f.securityA.id });
-    expect((await mutate('acknowledge', handler, {})).status).toBe(409);
-    expect((await mutate('resolve', handler, { notes: '  ' })).status).toBe(400);
-    expect((await mutate('resolve', handler, { notes: 'x'.repeat(1001) })).status).toBe(400);
-    expect((await mutate('resolve', peer, { notes: 'Peer cannot resolve' })).status).toBe(403);
+    expectError(await mutate('acknowledge', handler, {}), 409, 'ALERT_ALREADY_ACKNOWLEDGED');
+    expectError(await mutate('resolve', handler, { notes: '  ' }), 400, 'VALIDATION_ERROR');
+    expectError(await mutate('resolve', handler, { notes: 'x'.repeat(1001) }), 400, 'VALIDATION_ERROR');
+    expectError(await mutate('resolve', peer, { notes: 'Peer cannot resolve' }), 403, 'FORBIDDEN');
     const resolved = await mutate('resolve', admin, { notes: '  Passenger assisted at station  ' });
     expect(resolved.status).toBe(200);
     expect(resolved.body.data).toMatchObject({ status: 'RESOLVED', assignedToId: f.securityA.id, resolutionNote: 'Passenger assisted at station' });
-    expect((await mutate('resolve', handler, { notes: 'Already resolved' })).status).toBe(422);
+    expectError(await mutate('resolve', handler, { notes: 'Already resolved' }), 422, 'INVALID_STATE_TRANSITION');
     expect(await f.db.auditLog.count({ where: { entityId: fixture.alertId, action: { in: ['ALERT_CREATED', 'ALERT_ACKNOWLEDGED', 'ALERT_RESOLVED'] } } })).toBe(3);
   });
 

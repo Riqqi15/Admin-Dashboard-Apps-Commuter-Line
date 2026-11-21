@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { adminFixture, cookieOf, fixturePassword } from '../helpers/admin-api';
+import { expectError } from '../helpers/expect-error';
 
 let f: Awaited<ReturnType<typeof adminFixture>>;
 beforeAll(async () => { f = await adminFixture(); });
@@ -44,7 +45,7 @@ describe('Username/password authentication with real PostgreSQL sessions', () =>
     const disabledStation = await f.login(f.securityB.username);
     await f.db.station.update({ where: { id: f.stationB.id }, data: { isActive: true } });
     for (const attempt of [wrong, unknown, disabled, disabledStation]) {
-      expect(attempt.result.status).toBe(401);
+      expectError(attempt.result, 401, 'INVALID_CREDENTIALS');
       expect(attempt.result.body).toEqual(wrong.result.body);
       expect(attempt.cookie).toBe('');
     }
@@ -54,15 +55,23 @@ describe('Username/password authentication with real PostgreSQL sessions', () =>
     const first = await f.login();
     const logout = await request(f.app).post('/api/v1/auth/logout').set('Cookie', first.cookie).set('X-CSRF-Token', first.csrf).send({});
     expect(logout.status).toBe(200);
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie), 401, 'UNAUTHENTICATED');
     const expired = await f.login();
     await f.db.adminSession.updateMany({ where: { adminUserId: f.admin.id, revokedAt: null }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', expired.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', expired.cookie), 401, 'UNAUTHENTICATED');
     const disabled = await f.login(f.securityA.username);
     await f.db.adminUser.update({ where: { id: f.securityA.id }, data: { isActive: false } });
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', disabled.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', disabled.cookie), 401, 'UNAUTHENTICATED');
     await f.db.adminUser.update({ where: { id: f.securityA.id }, data: { isActive: true } });
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', disabled.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', disabled.cookie), 401, 'UNAUTHENTICATED');
+  });
+
+  it('rejects reusing the current password and a wrong current password with distinct codes', async () => {
+    const session = await f.login(f.securityA.username);
+    const change = (body: object) => request(f.app).post('/api/v1/auth/change-password').set('Cookie', session.cookie).set('X-CSRF-Token', session.csrf).send(body);
+    expectError(await change({ currentPassword: fixturePassword, newPassword: fixturePassword }), 400, 'PASSWORD_REUSE');
+    expectError(await change({ currentPassword: 'Wrong-current-passphrase-2026!', newPassword: 'Another-fixture-passphrase-2026!' }), 401, 'INVALID_CREDENTIALS');
+    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', session.cookie)).status).toBe(200);
   });
 
   it('rotates the current session, revokes other sessions and clears the temporary-password flag', async () => {
@@ -74,8 +83,8 @@ describe('Username/password authentication with real PostgreSQL sessions', () =>
     expect(updated.status).toBe(200);
     expect(updated.body.data.user.mustChangePassword).toBe(false);
     expect(cookieOf(updated)).not.toBe(first.cookie);
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie)).status).toBe(401);
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', other.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie), 401, 'UNAUTHENTICATED');
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', other.cookie), 401, 'UNAUTHENTICATED');
     expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', cookieOf(updated))).status).toBe(200);
     const stored = await f.db.adminUser.findUniqueOrThrow({ where: { id: f.securityB.id } });
     expect(await verify(stored.passwordHash, 'Changed-fixture-passphrase-2026!')).toBe(true);

@@ -2,6 +2,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { adminFixture, fixturePassword } from '../helpers/admin-api';
+import { expectError } from '../helpers/expect-error';
 
 let f: Awaited<ReturnType<typeof adminFixture>>;
 beforeAll(async () => { f = await adminFixture(); });
@@ -14,20 +15,20 @@ describe('Authentication abuse controls', () => {
     for (const token of [undefined, 'wrong', second.csrf]) {
       let call = request(f.app).post('/api/v1/auth/logout').set('Cookie', first.cookie);
       if (token) call = call.set('X-CSRF-Token', token);
-      expect((await call.send({})).status).toBe(403);
+      expectError(await call.send({}), 403, 'CSRF_INVALID');
     }
-    expect((await request(f.app).post('/api/v1/auth/logout').set('Cookie', first.cookie)
-      .set('X-CSRF-Token', first.csrf).set('Origin', 'https://attacker.example').send({})).status).toBe(403);
+    expectError(await request(f.app).post('/api/v1/auth/logout').set('Cookie', first.cookie)
+      .set('X-CSRF-Token', first.csrf).set('Origin', 'https://attacker.example').send({}), 403, 'ORIGIN_NOT_ALLOWED');
     expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie)).status).toBe(200);
-    expect((await request(f.app).post('/api/v1/auth/login').type('form').send({ username: f.admin.username, password: fixturePassword })).status).toBe(415);
+    expectError(await request(f.app).post('/api/v1/auth/login').type('form').send({ username: f.admin.username, password: fixturePassword }), 415, 'JSON_REQUIRED');
   });
 
   it('rejects unknown fields, forged/fixed tokens, URL tokens, and duplicate session cookies', async () => {
-    expect((await request(f.app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword, role: 'SUPER_ADMIN' })).status).toBe(400);
+    expectError(await request(f.app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword, role: 'SUPER_ADMIN' }), 400, 'VALIDATION_ERROR');
     const first = await f.login();
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', 'admin_session=' + 'a'.repeat(64))).status).toBe(401);
-    expect((await request(f.app).get('/api/v1/auth/me?admin_session=' + first.cookie.split('=')[1])).status).toBe(401);
-    expect((await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie + '; ' + first.cookie)).status).toBe(401);
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', 'admin_session=' + 'a'.repeat(64)), 401, 'UNAUTHENTICATED');
+    expectError(await request(f.app).get('/api/v1/auth/me?admin_session=' + first.cookie.split('=')[1]), 401, 'UNAUTHENTICATED');
+    expectError(await request(f.app).get('/api/v1/auth/me').set('Cookie', first.cookie + '; ' + first.cookie), 401, 'UNAUTHENTICATED');
     const fixed = await request(f.app).post('/api/v1/auth/login').set('Cookie', 'admin_session=' + 'b'.repeat(64)).send({ username: f.admin.username, password: fixturePassword });
     expect(fixed.status).toBe(200);
     expect(String(fixed.headers['set-cookie'])).not.toContain('b'.repeat(64));
@@ -37,11 +38,11 @@ describe('Authentication abuse controls', () => {
     const app = createApp(f.config, undefined, undefined, f.db);
     for (let i = 0; i < 5; i++) {
       const username = i % 2 ? ' ' + f.admin.username.toUpperCase() + ' ' : f.admin.username;
-      expect((await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', `198.51.100.${i + 1}`)
-        .send({ username, password: 'wrong-password' })).status).toBe(401);
+      expectError(await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', `198.51.100.${i + 1}`)
+        .send({ username, password: 'wrong-password' }), 401, 'INVALID_CREDENTIALS');
     }
     const limited = await request(app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword });
-    expect(limited.status).toBe(429);
+    expectError(limited, 429, 'RATE_LIMITED');
     expect(limited.headers['retry-after']).toBeDefined();
   });
 
@@ -50,6 +51,6 @@ describe('Authentication abuse controls', () => {
     for (let i = 0; i < 30; i++) {
       expect((await request(app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword })).status).toBe(200);
     }
-    expect((await request(app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword })).status).toBe(429);
+    expectError(await request(app).post('/api/v1/auth/login').send({ username: f.admin.username, password: fixturePassword }), 429, 'RATE_LIMITED');
   }, 30000);
 });

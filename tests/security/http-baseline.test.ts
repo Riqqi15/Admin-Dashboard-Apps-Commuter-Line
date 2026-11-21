@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
 import { errorHandler } from '../../src/http/error-handler';
+import { Prisma } from '../../src/generated/prisma/client';
+import { expectError } from '../helpers/expect-error';
 
 const config = parseEnv({
   NODE_ENV: 'test', DATABASE_URL: 'postgresql://dummy:dummy@localhost:5434/demo',
@@ -63,6 +65,24 @@ describe('HTTP security baseline', () => {
     const missing = await request(app()).get('/does-not-exist');
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ success: false, error: { code: 'NOT_FOUND', message: 'Resource not found' } });
+  });
+
+  it('rejects compressed request bodies instead of inflating them', async () => {
+    const result = await request(app()).post('/api/v1/unknown')
+      .set('Content-Type', 'application/json').set('Content-Encoding', 'gzip').send(Buffer.from('not-really-gzip'));
+    expectError(result, 415, 'UNSUPPORTED_ENCODING');
+  });
+
+  it('maps Prisma constraint errors to safe stable codes without leaking details', async () => {
+    const cases = [['P2002', 409, 'CONFLICT'], ['P2003', 409, 'RESOURCE_IN_USE'], ['P2025', 404, 'NOT_FOUND']] as const;
+    for (const [code, status, expected] of cases) {
+      const errorApp = express();
+      errorApp.get('/prisma', () => { throw new Prisma.PrismaClientKnownRequestError('constraint "secret_fk" violated on table admin_users', { code, clientVersion: 'test' }); });
+      errorApp.use(errorHandler);
+      const result = await request(errorApp).get('/prisma');
+      expectError(result, status, expected);
+      expect(result.text).not.toMatch(/secret_fk|admin_users|constraint/);
+    }
   });
 
   it('redacts unexpected errors even when runtime mode is development', async () => {
