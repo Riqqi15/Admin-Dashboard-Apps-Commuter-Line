@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { Alert, Prisma, PrismaClient } from '../../generated/prisma/client';
 import type { Env } from '../../config/env';
 import { AppError } from '../../http/errors';
-import { lockStation, lockUser, recordAudit } from '../../lib/admin-data';
+import { incrementDailyUsage, lockStation, lockUser, recordAudit, utcDay } from '../../lib/admin-data';
 import { decryptPii } from '../../lib/pii';
 import { stationScope } from '../../middleware/station-scope';
 import { invalidSession, type AuthContext } from '../auth/auth.service';
@@ -72,6 +72,17 @@ export function alertService(db: PrismaClient, config: Env) {
         if (alert.status !== 'NEW') throw new AppError(409, 'ALERT_ALREADY_ACKNOWLEDGED', 'Alert has already been claimed');
         const updated = await tx.alert.update({ where: { id }, data: { status: 'ACKNOWLEDGED', assignedToId: actor.userId, acknowledgedAt: new Date() }, select: publicSelect });
         await recordAudit(tx, actor.userId, 'ALERT_ACKNOWLEDGED', 'alert', id, alert.stationId);
+        const day = utcDay(updated.acknowledgedAt!);
+        const [aggregate] = await tx.$queryRaw<Array<{ averageResponseSeconds: number | null }>>`
+          SELECT ROUND(AVG(EXTRACT(EPOCH FROM (acknowledged_at - created_at))))::int AS "averageResponseSeconds"
+          FROM alerts WHERE station_id = ${alert.stationId}::uuid
+            AND acknowledged_at >= ${day} AND acknowledged_at < ${new Date(day.getTime() + 86400000)}
+        `;
+        await tx.dailyUsageStat.upsert({
+          where: { stationId_statDate: { stationId: alert.stationId, statDate: day } },
+          create: { stationId: alert.stationId, statDate: day, averageResponseSeconds: aggregate?.averageResponseSeconds ?? null },
+          update: { averageResponseSeconds: aggregate?.averageResponseSeconds ?? null },
+        });
         return updated;
       });
     },
@@ -82,6 +93,7 @@ export function alertService(db: PrismaClient, config: Env) {
         if (actor.role !== 'SUPER_ADMIN' && alert.assignedToId !== actor.userId) throw new AppError(403, 'FORBIDDEN', 'Only the assigned handler can resolve this alert');
         const updated = await tx.alert.update({ where: { id }, data: { status: 'RESOLVED', resolvedAt: new Date(), resolutionNote: notes }, select: publicSelect });
         await recordAudit(tx, actor.userId, 'ALERT_RESOLVED', 'alert', id, alert.stationId);
+        await incrementDailyUsage(tx, alert.stationId, updated.resolvedAt!, { resolvedAlertCount: 1 });
         return updated;
       });
     },

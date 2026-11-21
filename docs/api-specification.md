@@ -16,7 +16,7 @@ Endpoint di luar base path `/api/v1` yang sudah tersedia:
 | GET | `/health`, `/health/live` | 200, `data.status=ok`; liveness tanpa query database |
 | GET | `/health/ready` | 200, `data.status=ready` dan `data.database=connected` setelah query PostgreSQL; 503 `DATABASE_UNAVAILABLE` bila koneksi gagal |
 
-Endpoint authentication, stations, dan staff tersedia sejak Checkpoint B. Pada 17 November 2026, ingest simulator dan REST alert pada bagian 4-5 tersedia. SSE, analytics, dan endpoint pembacaan audit masih kontrak desain.
+Endpoint authentication, stations, staff, ingest simulator, REST/SSE alert, analytics, audit-read, dan worker retensi tersedia pada implementasi lokal. Runtime analytics/audit/retensi belum diverifikasi.
 
 ## 1. Format response
 
@@ -97,7 +97,7 @@ Staff-management hanya mengelola akun `STATION_SECURITY`. Field `role`, `passwor
 
 Petugas mendapat daftar berisi stasiun dari akun terkini di database, tanpa menerima pilihan scope dari client. Penggunaan query `stationId` oleh petugas ditolak 403, termasuk stationId sendiri. Semua route pengelolaan ditolak 403 untuk petugas. Perubahan akun petugas, reset sandi, serta penonaktifan akun/stasiun mencabut sesi yang terdampak. Pemindahan petugas tidak mengubah stasiun pada riwayat alert. Aktivitas login/logout, ganti sandi, serta mutasi stasiun/staff dicatat ke `audit_logs` dalam transaksi tanpa sandi atau token.
 
-Kesalahan input menghasilkan 400 `VALIDATION_ERROR`, duplikasi menghasilkan 409 `CONFLICT`, dan resource tidak ditemukan menghasilkan 404 `NOT_FOUND`, tanpa detail SQL/constraint. Pengujian isolasi mencakup stasiun/staff dan REST alert; SSE belum tersedia.
+Kesalahan input menghasilkan 400 `VALIDATION_ERROR`, duplikasi menghasilkan 409 `CONFLICT`, dan resource tidak ditemukan menghasilkan 404 `NOT_FOUND`, tanpa detail SQL/constraint. Pengujian isolasi mencakup stasiun/staff dan REST alert; SSE tersedia lokal tetapi belum diuji runtime.
 
 ## 4. Ingest sesi dan event
 
@@ -160,7 +160,7 @@ Kontrak implementasi ingest (17 November):
 - Event sebelum waktu mulai atau lebih lama dari event terakhir: 409 `EVENT_OUT_OF_ORDER`. Timestamp sama diterima menurut urutan transaksi. Event baru setelah `SESSION_ENDED`: 409 `SESSION_CLOSED`; sesi kedaluwarsa: 410 `SESSION_EXPIRED`.
 - Jenis event: `SESSION_STARTED`, `CAMERA_INIT_FAILED`, `ANALYSIS_FAILED`, `ANALYSIS_RECOVERED`, `SESSION_ENDED`. `errorCode` opsional, hanya pada kegagalan, dari allowlist: `CAMERA_UNAVAILABLE`, `CAMERA_INITIALIZATION_FAILED`, `FRAME_ENCODING_FAILED`, `VISION_TIMEOUT`, `VISION_PROVIDER_UNAVAILABLE`, `NETWORK_TIMEOUT`.
 - Satu sesi maksimal satu alert, termasuk saat request paralel. Kegagalan kritis menandai sesi FAILED; recovery mereset counter tanpa menghapus riwayat kegagalan atau menyelesaikan alert. FAILED belum menutup sesi sampai `SESSION_ENDED` diterima. Tidak ada panggilan/SMS otomatis; API membuat alert untuk ditangani petugas.
-- Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD terpisah per record/field. TTL sesi/event 7 hari dan metadata alert 30 hari sudah ditulis, tetapi worker penghapusan belum tersedia.
+- Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD terpisah per record/field. TTL sesi/event 7 hari dan metadata alert 30 hari ditangani worker retensi lokal; worker belum dijalankan atau dijadwalkan.
 
 ## 5. Alerts
 
@@ -170,7 +170,7 @@ Kontrak implementasi ingest (17 November):
 | GET | '/alerts/:id' | Semua admin | Scope diperiksa backend |
 | PATCH | '/alerts/:id/acknowledge' | Semua admin | NEW menjadi ACKNOWLEDGED |
 | PATCH | '/alerts/:id/resolve' | Pengambil alert/Super Admin | Catatan wajib |
-| GET | '/alerts/stream' | Semua admin | Rencana SSE; belum tersedia |
+| GET | '/alerts/stream' | Semua admin | SSE; cookie sesi, tanpa query scope |
 
 Kontrak REST alert yang tersedia:
 
@@ -180,6 +180,12 @@ Kontrak REST alert yang tersedia:
 - Resolve menerima `{"notes":"Pengguna telah dibantu"}`, di-trim, 1-1000 karakter. Hanya ACKNOWLEDGED dapat menjadi RESOLVED; handler awal tetap dicatat. Catatan jangan diisi sandi atau data pribadi tambahan.
 - Mutasi memerlukan cookie dan CSRF sesi. Role/stasiun/sesi dibaca ulang dalam transaksi setelah account lock untuk menolak permintaan yang bersamaan dengan pencabutan/pemindahan akun. Akses alert stasiun lain disamarkan sebagai 404.
 - Pembuatan, klaim, dan penyelesaian mencatat audit dalam transaksi yang sama; audit tidak menyimpan snapshot nama/telepon.
+- `GET /alerts/stream` memakai cookie sesi `HttpOnly` yang sama; browser membuka koneksi dengan `EventSource` dan `withCredentials: true`. Sesi yang wajib ganti sandi ditolak.
+- SSE mengirim `alert.created` setelah transaksi ingest sukses dan `alert.updated` setelah klaim/penyelesaian. Data hanya berisi `alertId`, `stationId`, `status`, dan `occurredAt`; tidak ada nama, telepon, catatan penyelesaian, atau teks bebas.
+- Filter petugas berasal dari role/stasiun sesi di server; tidak ada parameter `stationId` dari client. Super Admin menerima event semua stasiun.
+- Server mengirim heartbeat tiap 15 detik, memeriksa sesi/akun/stasiun tiap 30 detik, menutup stream saat akses dicabut, sesi habis, atau setelah 5 menit. Maksimal 3 stream per akun dan 500 koneksi per proses; kelebihan mendapat 429 `STREAM_LIMIT`.
+- Event hub bersifat in-memory dan hanya mencakup satu proses API. Jalankan satu instance untuk demo; deployment multi-instance memerlukan pub/sub bersama. SSE tidak menyimpan replay; client mengambil kondisi terbaru melalui `GET /alerts` setelah tersambung/tersambung ulang.
+- SSE adalah stream panjang, bukan request JSON biasa; Newman tidak menjalankannya sebagai bagian dari suite yang selesai otomatis. Verifikasi interaktif dilakukan dengan browser EventSource atau klien SSE.
 
 Status penting:
 
@@ -199,17 +205,22 @@ Status penting:
 
 Rentang tanggal dibatasi agar query tidak digunakan untuk DoS.
 
+- `GET /dashboard/summary` hanya menerima `stationId` opsional untuk Super Admin. Petugas mendapat scope dari akun aktif. Hasil memuat ringkasan UTC hari ini dan per stasiun, sesi aktif, serta alert belum selesai.
+- `GET /analytics/usage` menerima `from` dan `to` format `YYYY-MM-DD` (inklusif, default 7 hari terakhir), maksimal 31 hari, serta `stationId` hanya untuk Super Admin. Petugas dengan parameter stationId selalu ditolak. Sumber laporan adalah tabel agregat harian, sehingga tetap tersedia setelah data mentah 7 hari dihapus. Hasil dibatasi 5.000 baris dan memberi `truncated=true` bila batas itu tercapai.
+- Counter agregat diperbarui dalam transaksi sesi/event/alert: sesi, pengguna unik per stasiun per hari, sesi gagal, alert dibuat, alert selesai, dan rerata detik dari alert dibuat sampai diklaim. Hari statistik mengikuti UTC; rerata response dihitung berdasarkan waktu klaim.
+- `GET /audit-logs` hanya untuk Super Admin, halaman default 25/maksimal 100, dengan filter opsional station, action, from, dan to. Response hanya metadata audit; details bebas tidak dikirim.
+- Cleanup worker dapat dijalankan lokal dengan `npm run build` lalu `npm run retention`. Jadwalkan sekali sehari pada deployment; belum ada scheduler bawaan.
+
 ## 7. SSE
 
-Contoh:
+SSE (`GET /api/v1/alerts/stream`, tersedia lokal):
 
 ~~~text
 event: alert.created
-id: event-uuid
-data: {"alertId":"uuid","stationId":"uuid","status":"NEW","createdAt":"..."}
+data: {"alertId":"uuid","stationId":"uuid","status":"NEW","occurredAt":"..."}
 ~~~
 
-Payload awal tidak memuat nomor telepon. Detail sensitif hanya diambil melalui endpoint alert setelah otorisasi.
+Event juga dapat bernama `alert.updated` saat status berubah. Payload tidak memuat PII; detail sensitif hanya diambil melalui endpoint alert setelah otorisasi.
 
 ## 8. Security headers dan request rules
 

@@ -5,8 +5,9 @@ import { AppError } from '../../http/errors';
 import { ingestAuth } from './ingest-auth';
 import { eventSchema, sessionSchema } from './ingest.schema';
 import { ingestService } from './ingest.service';
+import type { AlertStream } from '../alerts/alert-stream';
 
-export function ingestRouter(db: PrismaClient, config: Env) {
+export function ingestRouter(db: PrismaClient, config: Env, alertStream: AlertStream) {
   const router = Router();
   const service = ingestService(db, config);
   router.use(...ingestAuth(config));
@@ -17,6 +18,7 @@ export function ingestRouter(db: PrismaClient, config: Env) {
   });
   router.post('/events', async (request, response) => {
     const result = await service.event(eventSchema.parse(request.body));
+    if (result.notification) alertStream.publish(result.notification);
     response.status(result.created ? 201 : 200).json({ success: true, data: result.data });
   });
   return router;

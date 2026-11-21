@@ -1,4 +1,29 @@
-# Progress backend — 17 November 2026
+# Progress backend — 21 November 2026
+
+## Task 8: notifikasi alert SSE
+
+- `GET /api/v1/alerts/stream` menggunakan sesi cookie yang sama dengan REST. Route menolak akun yang masih wajib mengganti sandi.
+- Event `alert.created` dipancarkan sesudah transaksi ingest commit. `alert.updated` dipancarkan sesudah klaim atau penyelesaian sukses.
+- Payload dibatasi pada ID alert/stasiun, status, dan waktu; tanpa data pengguna atau catatan bebas. Petugas menerima event stasiunnya saja; Super Admin menerima semua stasiun.
+- Heartbeat 15 detik, validasi sesi/akun/stasiun tiap 30 detik, batas koneksi 3 per akun/500 per proses, dan stream ditutup maksimal 5 menit agar sesi diperiksa ulang saat reconnect.
+- Pub/sub masih in-memory satu proses. Untuk demo jalankan satu API instance; scaling multi-instance memerlukan broker bersama. SSE tidak menyediakan replay; client memuat ulang daftar alert via REST saat konek ulang.
+- Verifikasi: `npm run typecheck`, `npm run build` lulus. 7 tes integrasi SSE (isolasi stasiun, Super Admin semua stasiun, alert.updated pada acknowledge/resolve, revokasi sesi menutup stream, batas koneksi per akun, penolakan tanpa autentikasi, penolakan mustChangePassword) lulus pada database terisolasi.
+
+API source belum direstart otomatis oleh perubahan ini; proses lama di port 3002 bila masih aktif belum memuat SSE sampai dibangun dan dijalankan ulang.
+
+## Task 9: analytics, audit-read, dan worker retensi
+
+- Worker sekali jalan mengosongkan snapshot PII alert setelah 7 hari dan menghapus alert/audit setelah TTL 30 hari.
+- Sesi, event, serta pengguna terlacak dihapus menurut `expires_at` 7 hari; sesi admin kedaluwarsa/dicabut ikut dibersihkan. Data stasiun, akun admin, dan statistik tidak disentuh.
+- Setiap operasi dibatasi 500 row per statement, tabel target tetap, mencatat jumlah row, dan gagal dengan exit code non-zero saat terjadi error. Operasi aman diulang; deployment perlu menjadwalkannya harian.
+- Jalankan `npm run build` lalu `npm run retention`. Worker belum dijalankan pada database demo/utama.
+- `/dashboard/summary`, `/analytics/usage` (rentang maksimal 31 hari), dan `/audit-logs` tersedia. Audit-read hanya Super Admin dan tidak mengembalikan field details.
+- Statistik harian UTC diperbarui transaksional saat sesi dibuat/gagal, alert dibuat/diklaim/diselesaikan. Data statistik bertahan setelah sesi/event 7 hari dibersihkan.
+- Verifikasi: 16 tes integrasi analytics (scope dashboard summary, parameter stationId, validasi rentang tanggal, default 7 hari, akses audit Super Admin only, filter audit, exclusion details, pagination, penolakan tanpa autentikasi) dan 8 tes daily stats (increment session/uniqueUser, no double-count, failedSessionCount, alertCount/resolvedAlertCount, averageResponseSeconds, duplikat event, independensi per stasiun) lulus.
+- 8 tes integrasi retensi (hapus alert/audit/sesi kedaluwarsa, PII purge tanpa hapus alert, PII purge idempoten, urutan FK, preservasi stasiun/akun/stats, hapus tracked user setelah sesi dihapus) lulus pada database terisolasi.
+- Request Postman analytics/audit tersedia: Dashboard Summary, Usage Statistics, Audit Logs, Audit Logs Filtered, SSE Alert Stream.
+
+## Ingest kamera dan REST alert: Tasks 6–7
 
 ## Ingest kamera dan REST alert: Tasks 6–7
 
@@ -10,7 +35,7 @@ Implementasi lokal berada pada branch `backend-camera-alerts`, melanjutkan auth/
 - List/detail/claim/resolve menerapkan scope stasiun dari akun terkini. Klaim bersamaan menghasilkan satu handler; penyelesaian memerlukan handler/Super Admin dan catatan. Sesi dibaca ulang dalam transaksi untuk menolak akses yang sudah dicabut atau akun yang dipindahkan.
 - Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD per record/field; snapshot alert dienkripsi terpisah. Daftar tidak memuat PII; detail menyembunyikan PII sesudah 7 hari. TTL 7/30 hari ditulis tetapi worker penghapusan fisik belum dibuat.
 - Pembuatan, klaim, dan penyelesaian alert mencatat audit tanpa snapshot PII dalam transaksi yang sama. Belum ada panggilan/SMS atau tampilan dashboard real-time.
-- Verifikasi: **59 tes pada 16 file lulus**, typecheck/build lulus. Newman kamera **22 request / 64 assertion**, regresi auth/stasiun **22 request / 55 assertion**. Collection **36 request / 44 script / 2 Environment**; 33 request tersedia, 3 analytics/audit masih draft. Seluruh kredensial/key pengujian acak hanya di memori dan fixture dibersihkan.
+- Verifikasi: **98 tes pada 20 file lulus** (termasuk SSE, analytics, daily stats, retention), typecheck/build lulus. Newman kamera **22 request / 64 assertion**, regresi auth/stasiun **22 request / 55 assertion**. Collection **38 request / 46 script / 2 Environment**. Seluruh kredensial/key pengujian acak hanya di memori dan fixture dibersihkan.
 - API specification, threat model, checklist keamanan, test plan, README dan panduan Postman diselaraskan dengan implementasi. Tidak ada perubahan schema/migration baru pada tahap ini.
 
 API source terbaru dijalankan secara native di `http://127.0.0.1:3002`, PostgreSQL proyek di port 5434. Default konfigurasi tetap 3000. Docker image tahap ini belum dibangun/dijalankan ulang. File Collection harus diimpor ulang ke aplikasi Postman; Environment private yang sudah diisi tetap dipertahankan.
@@ -80,9 +105,9 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Task 8: SSE untuk notifikasi alert sesuai stasiun, tanpa PII dan dengan revokasi koneksi saat sesi/akses dicabut.
-- Task 9: analytics, pembacaan audit, dan worker retensi 7/30 hari.
 - Tasks 10-12: CLI simulator/OpenAPI, acceptance penuh, CI dan release gate.
+- Docker image rebuild dengan SSE/analytics/retention terbaru.
+- Verifikasi end-to-end retention worker pada database staging sebelum production.
 
 Endpoint ingest simulator dan REST alert tersedia secara lokal; integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; perubahan auth dan kamera/alert berikutnya masih lokal sampai ada instruksi push.
 

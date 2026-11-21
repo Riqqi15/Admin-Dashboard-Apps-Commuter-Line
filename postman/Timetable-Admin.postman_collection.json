@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Timetable Admin API",
-    "description": "Checkpoint C: health, authentication, stations, staff, simulator camera ingest and station-scoped alerts are implemented. Analytics and audit listing remain draft. Run npm run postman:admin or npm run postman:camera for isolated real HTTP workflows. Do not run the full Collection: draft requests remain.",
+    "description": "Checkpoint C: health, authentication, stations, staff, simulator camera ingest, station-scoped alerts, analytics, audit listing, and SSE alert stream are implemented. Run npm run postman:admin or npm run postman:camera for isolated real HTTP workflows. SSE is a long-lived stream and cannot be executed via Newman; use Postman GUI or browser EventSource. Do not run the full Collection without an active session.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -1056,6 +1056,36 @@
               }
             }
           ]
+        },
+        {
+          "name": "SSE Alert Stream (long-lived)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts/stream",
+            "description": "KONEKSI STREAM PANJANG — tidak dapat dieksekusi melalui Newman atau Collection Runner. Buka di browser menggunakan EventSource atau kirim melalui tab Postman biasa (koneksi tidak selesai sendiri).\n\nMenggunakan cookie sesi admin_session yang sama dengan REST. Petugas menerima event stasiunnya saja; Super Admin menerima semua. Event: alert.created, alert.updated. Payload: alertId, stationId, status, occurredAt — tanpa PII.\n\nHeartbeat tiap 15 detik, validasi sesi tiap 30 detik, batas 3 stream per akun / 500 per proses, stream ditutup setelah 5 menit. retry: 3000ms. Client harus memanggil GET /alerts saat reconnect karena SSE tidak menyediakan replay."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// SSE bukan request biasa — assertion ini hanya memeriksa bahwa stream dimulai.",
+                  "pm.test(\"Content-Type text/event-stream\", () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -1077,7 +1107,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/dashboard/summary",
-            "description": ""
+            "description": "Ringkasan hari ini: total sesi, pengguna unik, sesi gagal, alert dibuat/selesai, sesi aktif, dan alert terbuka. Super Admin melihat semua stasiun; petugas otomatis difilter ke stasiunnya. Super Admin boleh mengirim ?stationId=uuid; petugas dilarang."
           },
           "event": [
             {
@@ -1085,11 +1115,17 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Summary memuat totals dan byStation\", () => {",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d).to.have.property('date');",
+                  "  pm.expect(d).to.have.property('totals');",
+                  "  pm.expect(d.totals).to.have.property('sessionCount');",
+                  "  pm.expect(d.totals).to.have.property('openAlerts');",
+                  "  pm.expect(d.totals).to.have.property('activeSessions');",
+                  "  pm.expect(d).to.have.property('byStation');",
+                  "  pm.expect(d.byStation).to.be.an('array');",
                   "});"
                 ]
               }
@@ -1110,8 +1146,8 @@
                 "value": "{{origin}}"
               }
             ],
-            "url": "{{baseUrl}}{{apiPath}}/analytics/usage?from={{from}}&to={{to}}&stationId={{stationId}}",
-            "description": ""
+            "url": "{{baseUrl}}{{apiPath}}/analytics/usage?from={{from}}&to={{to}}",
+            "description": "Statistik harian agregat. Parameter from/to format YYYY-MM-DD inklusif, maksimal 31 hari. Default 7 hari terakhir. Super Admin boleh menambahkan &stationId=uuid; petugas dilarang. Maks 5000 baris; truncated=true bila lebih."
           },
           "event": [
             {
@@ -1120,8 +1156,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "const end = new Date();",
-                  "pm.environment.set(\"to\", end.toISOString());",
-                  "pm.environment.set(\"from\", new Date(end.getTime() - 86400000).toISOString());"
+                  "const pad = d => d.toISOString().slice(0, 10);",
+                  "pm.environment.set(\"to\", pad(end));",
+                  "pm.environment.set(\"from\", pad(new Date(end.getTime() - 6 * 86400000)));"
                 ]
               }
             },
@@ -1130,11 +1167,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Usage memuat items dan truncated\", () => {",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d).to.have.property('items');",
+                  "  pm.expect(d.items).to.be.an('array');",
+                  "  pm.expect(d).to.have.property('truncated');",
+                  "  pm.expect(d).to.have.property('from');",
+                  "  pm.expect(d).to.have.property('to');",
                   "});"
                 ]
               }
@@ -1161,7 +1202,7 @@
               }
             ],
             "url": "{{baseUrl}}{{apiPath}}/audit-logs",
-            "description": ""
+            "description": "Hanya Super Admin. Pagination default 25, maks 100. Filter opsional: stationId, action (ALERT_CREATED, ALERT_ACKNOWLEDGED, ALERT_RESOLVED, LOGIN, LOGOUT, dll.), from dan to (YYYY-MM-DD inklusif). Field details tidak dikembalikan."
           },
           "event": [
             {
@@ -1169,11 +1210,53 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 200\", () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "pm.test(\"Response JSON sesuai kontrak\", () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.success).to.eql(true);",
-                  "  pm.expect(json).to.have.property(\"data\");",
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"Audit memuat items, total, page\", () => {",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d).to.have.property('items');",
+                  "  pm.expect(d.items).to.be.an('array');",
+                  "  pm.expect(d).to.have.property('total');",
+                  "  pm.expect(d).to.have.property('page');",
+                  "  pm.expect(d).to.have.property('pageSize');",
+                  "});",
+                  "pm.test(\"Tidak ada field details\", () => {",
+                  "  const items = pm.response.json().data.items;",
+                  "  items.forEach(item => pm.expect(item).to.not.have.property('details'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Audit Logs Filtered",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/audit-logs?action=ALERT_CREATED&pageSize=5",
+            "description": "Contoh filter audit berdasarkan action. Ganti action sesuai kebutuhan: LOGIN, LOGOUT, ALERT_ACKNOWLEDGED, ALERT_RESOLVED, STAFF_CREATED, STATION_CREATED, dll."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
+                  "pm.test(\"All items match filter\", () => {",
+                  "  const items = pm.response.json().data.items;",
+                  "  items.forEach(item => pm.expect(item.action).to.eql('ALERT_CREATED'));",
                   "});"
                 ]
               }

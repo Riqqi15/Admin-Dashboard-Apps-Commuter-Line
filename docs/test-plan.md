@@ -1,15 +1,20 @@
 # Test Plan — Timetable Admin Backend
 
-## Bukti lokal 17 November 2026
+## Bukti lokal 21 November 2026
 
-- `npm test`: 59 tes pada 16 file, termasuk auth/stasiun, ingest, crypto PII, REST alert dan race.
+- `npm test`: **98 tes pada 20 file**, termasuk auth/stasiun, ingest, crypto PII, REST alert, race, SSE stream, analytics, daily stats, dan retention.
 - `npm run postman:camera`: 22 request HTTP / 64 assertion. Ambang gagal 1–3, replay identik, detail sesuai scope, claim/resolve serta penolakan lintas stasiun.
 - `npm run postman:admin`: regresi 22 request HTTP / 55 assertion.
-- `npm run postman:validate`: 36 request / 44 script / 2 Environment, secret contoh kosong.
+- `npm run postman:validate`: **38 request / 46 script / 2 Environment**, secret contoh kosong.
+- `npm run typecheck`: lulus tanpa error.
 - Race ingest mencakup UUID berbeda casing, ID event sama lintas sesi, event paralel, counter dan satu alert. Race alert mencakup dua claimant dan pencabutan/pemindahan akun setelah middleware autentikasi.
 - Crypto memeriksa roundtrip, IV acak, key/AAD salah dan manipulasi tag. Detail menguji snapshot tidak mengikuti perubahan profil serta penekanan PII setelah 7 hari.
+- SSE: isolasi stasiun, Super Admin semua stasiun, event updated pada acknowledge/resolve, revokasi sesi menutup stream, batas koneksi per akun (3 max), penolakan tanpa autentikasi, penolakan mustChangePassword.
+- Analytics: scope dashboard summary (station security vs Super Admin), parameter stationId rejection, validasi rentang tanggal (31 hari max, reversed), default 7 hari, audit logs Super Admin only, filter audit (station/action/date), exclusion details, pagination, penolakan tanpa autentikasi.
+- Daily stats: increment session/uniqueUser, no double-count same user same day, failedSessionCount pada transisi FAILED pertama, alertCount/resolvedAlertCount, averageResponseSeconds, duplikat event idempoten, independensi per stasiun.
+- Retention: hapus alert/audit/sesi kedaluwarsa, PII purge tanpa hapus alert, PII purge idempoten, urutan FK (events sebelum sessions), preservasi stasiun/akun/stats, hapus tracked user setelah sesi dihapus.
 
-Daftar skenario berikut tetap menjadi target acceptance lengkap. SSE, worker penghapusan, analytics, OpenAPI, dan deployment Docker terbaru belum dibuktikan oleh hasil di atas.
+Daftar skenario berikut tetap menjadi target acceptance lengkap. OpenAPI dan deployment Docker terbaru belum dibuktikan oleh hasil pengujian.
 
 ## 1. Tujuan
 

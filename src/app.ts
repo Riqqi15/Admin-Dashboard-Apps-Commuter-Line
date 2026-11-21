@@ -12,6 +12,9 @@ import { stationRouter } from './features/stations/station.router';
 import { staffRouter } from './features/staff/staff.router';
 import { ingestRouter } from './features/ingest/ingest.router';
 import { alertRouter } from './features/alerts/alert.router';
+import { createAlertStream } from './features/alerts/alert-stream';
+import { analyticsRouter } from './features/analytics/analytics.router';
+import { auditRouter } from './features/audit/audit.router';
 
 export function createApp(config: Env, logger: Logger = createLogger(config), checkDatabase: () => Promise<unknown> = async () => { throw new Error('Readiness check not configured'); }, database?: PrismaClient) {
   const app = express();
@@ -32,11 +35,14 @@ export function createApp(config: Env, logger: Logger = createLogger(config), ch
     }
   });
   if (database) {
+    const alertStream = createAlertStream();
     app.use('/api/v1/auth', authRouter(database, config));
     app.use('/api/v1/stations', stationRouter(database, config));
     app.use('/api/v1/staff', staffRouter(database, config));
-    app.use('/api/v1/ingest', ingestRouter(database, config));
-    app.use('/api/v1/alerts', alertRouter(database, config));
+    app.use('/api/v1/ingest', ingestRouter(database, config, alertStream));
+    app.use('/api/v1/alerts', alertRouter(database, config, alertStream));
+    app.use('/api/v1', analyticsRouter(database, config));
+    app.use('/api/v1/audit-logs', auditRouter(database, config));
   }
   app.use((_request, _response, next) => next(new AppError(404, 'NOT_FOUND', 'Resource not found')));
   app.use(errorHandler);

@@ -99,6 +99,7 @@ async function main() {
     await db.auditLog.deleteMany({ where: { OR: [{ actorAdminUserId: { in: users } }, { stationId: { in: stations } }] } });
     await db.adminSession.deleteMany({ where: { adminUserId: { in: users } } });
     await db.adminUser.deleteMany({ where: { id: { in: users } } });
+    await db.dailyUsageStat.deleteMany({ where: { stationId: { in: stations } } });
     await db.station.deleteMany({ where: { id: { in: stations } } });
     await db.$disconnect();
   }

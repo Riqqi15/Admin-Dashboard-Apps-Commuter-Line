@@ -2,10 +2,11 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import type { Env } from '../../config/env';
 import type { CameraSession, Prisma, PrismaClient } from '../../generated/prisma/client';
 import { AppError } from '../../http/errors';
-import { lockStation, recordAudit } from '../../lib/admin-data';
+import { incrementDailyUsage, lockStation, recordAudit, utcDay } from '../../lib/admin-data';
 import { decryptPii, encryptPii } from '../../lib/pii';
 import { failureState } from '../alerts/alert-state';
 import type { EventInput, SessionInput } from './ingest.schema';
+import type { AlertStreamEvent } from '../alerts/alert-stream';
 
 const conflict = () => new AppError(409, 'IDEMPOTENCY_CONFLICT', 'Identifier was already used with a different payload');
 const sourceAllowed = (session: CameraSession) => { if (session.source !== 'SIMULATOR') throw new AppError(403, 'INGEST_SOURCE_MISMATCH', 'Simulator credentials cannot access this session'); };
@@ -47,6 +48,9 @@ export function ingestService(db: PrismaClient, config: Env) {
         const pii = { displayNameCiphertext: encryptPii(input.displayName, config.PII_ENCRYPTION_KEY, 'user:' + userId + ':name'), phoneCiphertext: input.phone ? encryptPii(input.phone, config.PII_ENCRYPTION_KEY, 'user:' + userId + ':phone') : null, lastSeenAt: now, expiresAt };
         const user = prior ? await tx.trackedUser.update({ where: { id: userId }, data: pii }) : await tx.trackedUser.create({ data: { id: userId, externalUserId: input.externalUserId, ...pii } });
         const session = await tx.cameraSession.create({ data: { externalSessionId: input.externalSessionId, payloadFingerprint, trackedUserId: user.id, stationId: station.id, source: 'SIMULATOR', startedAt: input.startedAt, expiresAt } });
+        const day = utcDay(input.startedAt);
+        const priorUsage = await tx.cameraSession.findFirst({ where: { id: { not: session.id }, stationId: station.id, trackedUserId: user.id, startedAt: { gte: day, lt: new Date(day.getTime() + 86400000) } }, select: { id: true } });
+        await incrementDailyUsage(tx, station.id, input.startedAt, { sessionCount: 1, uniqueUserCount: priorUsage ? 0 : 1 });
         return { created: true, data: publicSession(session) };
       });
     },
@@ -55,7 +59,7 @@ export function ingestService(db: PrismaClient, config: Env) {
       const now = new Date();
       fresh(input.occurredAt, now);
       const payloadFingerprint = fingerprint(config, 'event', { eventId: input.eventId, externalSessionId: input.externalSessionId, type: input.type, errorCode: input.errorCode ?? null, occurredAt: input.occurredAt.toISOString() });
-      return db.$transaction(async tx => {
+      const result = await db.$transaction(async tx => {
         // A global event ID is locked before choosing its session, including conflicting cross-session deliveries.
         await lockIdentifier(tx, 'event', input.eventId);
         const existing = await tx.cameraEvent.findUnique({ where: { eventId: input.eventId }, include: { cameraSession: { include: { alert: true } } } });
@@ -79,18 +83,25 @@ export function ingestService(db: PrismaClient, config: Env) {
         const state = failureState(session.consecutiveFailures, input.type);
         const failed = session.status === 'FAILED' || state.shouldAlert;
         const updated = await tx.cameraSession.update({ where: { id: session.id }, data: { consecutiveFailures: state.failures, status: failed ? 'FAILED' : input.type === 'SESSION_ENDED' ? 'COMPLETED' : 'ACTIVE', ...(input.type === 'SESSION_ENDED' ? { endedAt: input.occurredAt } : {}) } });
+        if (session.status !== 'FAILED' && updated.status === 'FAILED') {
+          await incrementDailyUsage(tx, session.stationId, session.startedAt, { failedSessionCount: 1 });
+        }
         let alertId = session.alert?.id ?? null;
+        let notification: AlertStreamEvent | undefined;
         if (state.shouldAlert && !alertId) {
           alertId = randomUUID();
           const user = session.trackedUser;
           const name = decryptPii(user.displayNameCiphertext, config.PII_ENCRYPTION_KEY, 'user:' + user.id + ':name');
           const phone = user.phoneCiphertext ? decryptPii(user.phoneCiphertext, config.PII_ENCRYPTION_KEY, 'user:' + user.id + ':phone') : null;
-          await tx.alert.create({ data: { id: alertId, cameraSessionId: session.id, sourceSessionId: session.id, stationId: session.stationId, trackedUserId: user.id, userNameCiphertext: encryptPii(name, config.PII_ENCRYPTION_KEY, 'alert:' + alertId + ':name'), userPhoneCiphertext: phone ? encryptPii(phone, config.PII_ENCRYPTION_KEY, 'alert:' + alertId + ':phone') : null, failureType: input.type as 'CAMERA_INIT_FAILED' | 'ANALYSIS_FAILED', errorCode: input.errorCode ?? null, expiresAt: new Date(now.getTime() + 30 * 86400000) } });
+          const alert = await tx.alert.create({ data: { id: alertId, cameraSessionId: session.id, sourceSessionId: session.id, stationId: session.stationId, trackedUserId: user.id, userNameCiphertext: encryptPii(name, config.PII_ENCRYPTION_KEY, 'alert:' + alertId + ':name'), userPhoneCiphertext: phone ? encryptPii(phone, config.PII_ENCRYPTION_KEY, 'alert:' + alertId + ':phone') : null, failureType: input.type as 'CAMERA_INIT_FAILED' | 'ANALYSIS_FAILED', errorCode: input.errorCode ?? null, expiresAt: new Date(now.getTime() + 30 * 86400000) } });
           await recordAudit(tx, null, 'ALERT_CREATED', 'alert', alertId, session.stationId);
+          await incrementDailyUsage(tx, session.stationId, session.startedAt, { alertCount: 1 });
+          notification = { type: 'alert.created', alertId, stationId: alert.stationId, status: alert.status, occurredAt: alert.createdAt.toISOString() };
         }
         await tx.trackedUser.update({ where: { id: session.trackedUserId }, data: { lastSeenAt: now, expiresAt: new Date(now.getTime() + 7 * 86400000) } });
-        return { created: true, data: { id: event.id, eventId: event.eventId, sessionId: session.id, consecutiveFailures: state.failures, status: updated.status, alertId } };
+        return { created: true, data: { id: event.id, eventId: event.eventId, sessionId: session.id, consecutiveFailures: state.failures, status: updated.status, alertId }, notification };
       });
+      return result;
     },
   };
 }

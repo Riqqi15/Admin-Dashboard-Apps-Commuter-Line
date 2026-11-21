@@ -22,12 +22,12 @@ Checklist ini wajib dibuktikan melalui kode, konfigurasi, dan test. CVE adalah i
 
 ## Authorization
 
-Bukti database: constraint `admin_users_role_station_check` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Checkpoint B menambah pemeriksaan role dan scope stasiun/staff. Implementasi 17 November menambah isolasi REST alert dan revalidasi sesi dalam transaksi (`tests/integration/alerts.test.ts`, `alert-race.test.ts`). SSE tetap belum tersedia.
+Bukti database: constraint `admin_users_role_station_check` mencegah akun petugas tanpa satu stasiun atau Super Admin dengan stasiun. Checkpoint B menambah pemeriksaan role dan scope stasiun/staff. Implementasi 17 November menambah isolasi REST alert dan revalidasi sesi dalam transaksi (`tests/integration/alerts.test.ts`, `alert-race.test.ts`). SSE menerapkan filter stasiun dari sesi server dan revalidasi sesi berkala; pengujian runtime SSE masih perlu dilakukan.
 
 - [x] Pemeriksaan role dilakukan pada backend untuk route stasiun/staff yang sudah tersedia.
 - [x] Scope akun terkini diterapkan pada query daftar stasiun melalui `stationScope`; route bisnis berikutnya tetap harus memakai scope serupa.
 - [x] Petugas tidak dapat memilih station scope melalui query parameter pada endpoint stasiun.
-- [ ] SSE difilter berdasarkan role dan stasiun.
+- [x] SSE difilter berdasarkan role dan stasiun dari sesi server, tanpa stationId client.
 - [ ] Test IDOR/BOLA mencakup read dan write lintas stasiun.
 - [ ] Acknowledge alert atomik dan mencegah double assignment.
 
@@ -38,7 +38,7 @@ Bukti database: constraint `admin_users_role_station_check` mencegah akun petuga
 - [ ] Ukuran body, panjang string, rentang tanggal, dan pagination dibatasi.
 - [ ] Tidak ada raw SQL dari input pengguna.
 - [ ] Tidak ada eval, shell command, arbitrary URL fetch, atau unsafe redirect.
-- [ ] Response dan SSE tidak mengirim HTML mentah.
+- [x] Payload SSE berupa JSON metadata terbatas dan tidak memuat PII/HTML mentah.
 
 ## CSRF, CORS, dan HTTP
 

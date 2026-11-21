@@ -48,6 +48,7 @@ export async function adminFixture() {
       await db.auditLog.deleteMany({ where: { OR: [{ actorAdminUserId: { in: userIds } }, { stationId: { in: stationIds } }] } });
       await db.adminSession.deleteMany({ where: { adminUserId: { in: userIds } } });
       await db.adminUser.deleteMany({ where: { id: { in: userIds } } });
+      await db.dailyUsageStat.deleteMany({ where: { stationId: { in: stationIds } } });
       await db.station.deleteMany({ where: { id: { in: stationIds } } });
       await db.$disconnect();
     },

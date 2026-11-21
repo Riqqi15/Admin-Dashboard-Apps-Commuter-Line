@@ -2,9 +2,9 @@
 
 Backend-only capstone untuk memantau penggunaan Camera Assist per stasiun dan mengelola alert kegagalan kamera oleh petugas keamanan.
 
-Tahap saat ini: fondasi Express/TypeScript, PostgreSQL + Prisma, auth username/sandi, pengelolaan stasiun/petugas, ingest simulator kamera, serta alert sudah tersedia. Petugas hanya dapat melihat dan menangani alert stasiunnya. SSE, analytics, endpoint pembacaan audit, dan worker retensi menjadi tahap berikutnya.
+Tahap saat ini: fondasi Express/TypeScript, PostgreSQL + Prisma, auth username/sandi, pengelolaan stasiun/petugas, ingest simulator kamera, REST/SSE alert, analytics, audit-read, dan worker retensi tersedia lokal. Petugas hanya dapat melihat dan menangani data stasiunnya.
 
-Collection Postman dan Environment lokal tersedia: 33 request untuk endpoint yang sudah tersedia dan 3 request analytics/audit yang masih draft. Workflow otomatis `npm run postman:camera` menjalankan 22 request nyata untuk alur kamera gagal sampai bantuan selesai. Lihat [panduan Postman](postman/README.md) dan [catatan progres](docs/progress.md).
+Collection Postman dan Environment lokal tersedia. Request untuk analytics/audit belum disiapkan untuk demo Postman; endpoint dapat dipanggil sesuai spesifikasi API. Workflow otomatis `npm run postman:camera` menjalankan 22 request nyata untuk alur kamera gagal sampai bantuan selesai. Lihat [panduan Postman](postman/README.md) dan [catatan progres](docs/progress.md).
 
 ## Menjalankan lokal
 
