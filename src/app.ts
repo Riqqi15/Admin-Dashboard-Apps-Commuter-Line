@@ -15,6 +15,7 @@ import { alertRouter } from './features/alerts/alert.router';
 import { createAlertStream } from './features/alerts/alert-stream';
 import { analyticsRouter } from './features/analytics/analytics.router';
 import { auditRouter } from './features/audit/audit.router';
+import { openApiDocument } from './features/docs/openapi';
 
 export function createApp(config: Env, logger: Logger = createLogger(config), checkDatabase: () => Promise<unknown> = async () => { throw new Error('Readiness check not configured'); }, database?: PrismaClient) {
   const app = express();
@@ -34,6 +35,9 @@ export function createApp(config: Env, logger: Logger = createLogger(config), ch
       next(new AppError(503, 'DATABASE_UNAVAILABLE', 'Database is unavailable'));
     }
   });
+  if (config.NODE_ENV !== 'production') {
+    app.get('/api/v1/openapi.json', (_request, response) => { response.json(openApiDocument()); });
+  }
   if (database) {
     const alertStream = createAlertStream();
     app.use('/api/v1/auth', authRouter(database, config));

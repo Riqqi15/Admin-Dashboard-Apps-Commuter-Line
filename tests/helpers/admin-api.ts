@@ -5,6 +5,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
 import { createPrisma } from '../../src/lib/prisma';
+import { testDatabaseUrl } from './test-db';
 
 loadEnvFile('.env');
 export const fixturePassword = 'Fixture-passphrase-2026!';
@@ -12,13 +13,9 @@ const passwordHash = hash(fixturePassword, { type: argon2id, memoryCost: 65536, 
 
 export async function adminFixture() {
   const prefix = 'test.' + randomUUID().slice(0, 8);
-  const databaseUrl = new URL(process.env.DATABASE_URL!);
+  const databaseUrl = new URL(testDatabaseUrl());
   databaseUrl.searchParams.set('application_name', prefix);
   const config = parseEnv({ ...process.env, DATABASE_URL: databaseUrl.toString(), NODE_ENV: 'test', LOG_LEVEL: 'silent', SIMULATOR_INGEST_KEY: 'fixture-ingest-key-' + randomUUID() });
-  const target = new URL(config.DATABASE_URL);
-  if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin') {
-    throw new Error('API fixtures require the isolated capstone database');
-  }
   const db = createPrisma(config.DATABASE_URL);
   const stations = await Promise.all(['A', 'B'].map(suffix => db.station.create({ data: { code: `${prefix}-${suffix}`.toUpperCase(), name: `Fixture ${suffix}` } })));
   const stationA = stations[0]!;

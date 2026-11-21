@@ -4,7 +4,7 @@ Backend-only capstone untuk memantau penggunaan Camera Assist per stasiun dan me
 
 Tahap saat ini: fondasi Express/TypeScript, PostgreSQL + Prisma, auth username/sandi, pengelolaan stasiun/petugas, ingest simulator kamera, REST/SSE alert, analytics, audit-read, dan worker retensi tersedia lokal. Petugas hanya dapat melihat dan menangani data stasiunnya.
 
-Collection Postman dan Environment lokal tersedia. Request untuk analytics/audit belum disiapkan untuk demo Postman; endpoint dapat dipanggil sesuai spesifikasi API. Workflow otomatis `npm run postman:camera` menjalankan 22 request nyata untuk alur kamera gagal sampai bantuan selesai. Lihat [panduan Postman](postman/README.md) dan [catatan progres](docs/progress.md).
+Collection Postman dan Environment lokal tersedia, termasuk request analytics, audit, dan SSE. Dokumen OpenAPI 3.1 tersedia di `GET /api/v1/openapi.json` (hanya di luar production). Workflow otomatis `npm run postman:camera` menjalankan 22 request nyata untuk alur kamera gagal sampai bantuan selesai. Lihat [panduan Postman](postman/README.md) dan [catatan progres](docs/progress.md).
 
 ## Menjalankan lokal
 
@@ -28,6 +28,16 @@ Di terminal lain, jalankan `npm run postman:health`, atau impor file JSON lalu k
 `/health/live` menyediakan respons yang sama. `/health/ready` menguji koneksi PostgreSQL: HTTP 200 dengan `data.status=ready` bila terhubung, atau HTTP 503 tanpa detail internal bila database tidak tersedia.
 
 Untuk pemeriksaan kode: `npm test`, `npm run typecheck`, dan `npm run build`. Untuk menjalankan hasil build: `npm start`.
+
+**Database test terpisah.** `npm test`, `npm run postman:admin`, dan `npm run postman:camera` hanya memakai database `timetable_admin_test` pada server PostgreSQL yang sama (`127.0.0.1:5434`/`5435`), tidak pernah `timetable_admin` (demo). Langkah `pretest` (`npm run db:test:setup`) membuat database itu bila belum ada lalu menjalankan migration; tidak pernah menghapus apa pun. Guard di helper tes menolak URL selain `timetable_admin_test`. Worker retensi diuji lewat `runRetention` di database ini; `npm run retention` jangan dijalankan terhadap database demo sebelum Anda memeriksa datanya.
+
+**Simulator kamera** (development saja; butuh API berjalan dan `SIMULATOR_INGEST_KEY` di `.env`):
+
+```powershell
+npm run simulate -- three-consecutive-failures --station <uuid-stasiun>
+```
+
+Skenario: `healthy-session`, `camera-init-failed`, `two-failures-then-recovered`, `three-consecutive-failures`, `duplicate-event`. Opsi `--base-url` hanya menerima alamat lokal. Output hanya berisi ID dan status HTTP, tanpa key atau data penumpang.
 
 Setelah database dan migration siap, jalankan `npm run postman:admin` untuk menguji login, ganti sandi, pengelolaan stasiun/petugas, reset sandi, akses stasiun sendiri, penolakan perubahan scope, dan logout. Perintah ini membangun source terbaru, membuka server loopback pada port sementara, memakai kredensial acak hanya di memori, lalu membersihkan akun/stasiun/sesi fixture. Akun demo tidak diubah. Docker tidak diperlukan untuk workflow ini bila PostgreSQL native sudah aktif.
 

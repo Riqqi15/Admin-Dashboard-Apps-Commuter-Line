@@ -13,9 +13,11 @@ const camera = process.argv.includes('--camera');
 async function main() {
   loadEnvFile(resolve(__dirname, '../.env'));
   if (process.env.NODE_ENV === 'production') throw new Error('Development-only API workflow');
-  const config = parseEnv({ ...process.env, NODE_ENV: 'test', LOG_LEVEL: 'silent', SIMULATOR_INGEST_KEY: randomBytes(32).toString('hex') });
-  const target = new URL(config.DATABASE_URL);
-  if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin') throw new Error('Isolated local capstone database required');
+  // Newman fixtures run against the dedicated *_test database, never the demo database.
+  const target = new URL(process.env.DATABASE_URL);
+  if (target.pathname === '/timetable_admin') target.pathname = '/timetable_admin_test';
+  if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin_test') throw new Error('Isolated timetable_admin_test database required');
+  const config = parseEnv({ ...process.env, DATABASE_URL: target.toString(), NODE_ENV: 'test', LOG_LEVEL: 'silent', SIMULATOR_INGEST_KEY: randomBytes(32).toString('hex') });
   const db = createPrisma(config.DATABASE_URL);
   const prefix = 'test.' + randomUUID().slice(0, 8);
   const password = () => randomBytes(24).toString('hex');

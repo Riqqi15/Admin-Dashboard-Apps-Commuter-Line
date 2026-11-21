@@ -1,14 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { loadEnvFile } from 'node:process';
 import { verify } from 'argon2';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createPrisma } from '../../src/lib/prisma';
 import { seedDemo } from '../../src/lib/seed';
+import { testDatabaseUrl } from '../helpers/test-db';
 
-loadEnvFile('.env');
-const url = new URL(process.env.DATABASE_URL!);
-if (url.hostname !== '127.0.0.1' || !['5434', '5435'].includes(url.port) || url.pathname !== '/timetable_admin') throw new Error('Seed tests require isolated local database');
-const prisma = createPrisma(url.toString());
+const prisma = createPrisma(testDatabaseUrl());
 afterAll(() => prisma.$disconnect());
 const credentials = {
   NODE_ENV: 'development',

@@ -5,7 +5,7 @@ Format: JSON UTF-8
 ID publik: UUID  
 Waktu: ISO 8601 UTC
 
-Dokumen ini adalah kontrak desain. OpenAPI YAML final dibuat pada tahap implementasi.
+Dokumen ini adalah kontrak desain. Dokumen OpenAPI 3.1 yang dihasilkan dari skema validasi Zod tersedia di `GET /api/v1/openapi.json` (tidak disajikan pada production) dan diuji agar cocok dengan seluruh route yang terpasang.
 
 ## Status implementasi health
 
@@ -16,7 +16,7 @@ Endpoint di luar base path `/api/v1` yang sudah tersedia:
 | GET | `/health`, `/health/live` | 200, `data.status=ok`; liveness tanpa query database |
 | GET | `/health/ready` | 200, `data.status=ready` dan `data.database=connected` setelah query PostgreSQL; 503 `DATABASE_UNAVAILABLE` bila koneksi gagal |
 
-Endpoint authentication, stations, staff, ingest simulator, REST/SSE alert, analytics, audit-read, dan worker retensi tersedia pada implementasi lokal. Runtime analytics/audit/retensi belum diverifikasi.
+Endpoint authentication, stations, staff, ingest simulator, REST/SSE alert, analytics, audit-read, dan worker retensi tersedia pada implementasi lokal dan diverifikasi oleh tes integrasi pada database test terpisah (`timetable_admin_test`).
 
 ## 1. Format response
 

@@ -1,5 +1,14 @@
 # Progress backend — 21 November 2026
 
+## Database test terpisah, OpenAPI, dan simulator
+
+- Vitest dan Newman kini memakai database `timetable_admin_test` di server yang sama; `npm run db:test:setup` (otomatis lewat `pretest`) membuatnya dan menjalankan migration, tanpa DROP. Helper `tests/helpers/test-db.ts` menolak URL selain database test. Baris database demo terbukti tidak berubah setelah seluruh run.
+- Worker retensi dipecah menjadi `runRetention(db, now)` (`src/workers/retention-job.ts`) dan entry point `retention.ts`; tes retensi sekarang memanggil fungsi asli.
+- `GET /api/v1/openapi.json` (non-production): OpenAPI 3.1 dengan 23 path, skema request diturunkan dari Zod. Tidak ada Swagger UI agar tidak menambah dependency runtime.
+- `npm run simulate -- <skenario> --station <uuid>` mengirim lima skenario kamera ke API lokal tanpa mencetak key atau data penumpang.
+- Verifikasi: **101 tes pada 21 file**, typecheck, build, Newman kamera 22/64, admin 22/55, Postman validate 38 request lulus.
+- Belum: `test:docker` dengan database `_test`, rebuild image Docker, CI (Task 12), tes audit per aksi.
+
 ## Task 8: notifikasi alert SSE
 
 - `GET /api/v1/alerts/stream` menggunakan sesi cookie yang sama dengan REST. Route menolak akun yang masih wajib mengganti sandi.
@@ -105,9 +114,10 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Tasks 10-12: CLI simulator/OpenAPI, acceptance penuh, CI dan release gate.
-- Docker image rebuild dengan SSE/analytics/retention terbaru.
-- Verifikasi end-to-end retention worker pada database staging sebelum production.
+- Tasks 11-12: acceptance Postman penuh, CI dan release gate.
+- Docker image rebuild dengan SSE/analytics/retention/OpenAPI terbaru dan uji `test:docker`.
+- Tes audit per aksi (login, staff, claim/resolve, penolakan lintas stasiun).
+- Menjalankan `npm run retention` terhadap data demo hanya setelah data diperiksa.
 
 Endpoint ingest simulator dan REST alert tersedia secara lokal; integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; perubahan auth dan kamera/alert berikutnya masih lokal sampai ada instruksi push.
 

@@ -1,15 +1,13 @@
-import { loadEnvFile } from 'node:process';
 import pino from 'pino';
 import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
 import { createPrisma } from '../../src/lib/prisma';
+import { testDatabaseUrl } from '../helpers/test-db';
 
-loadEnvFile('.env');
-const config = parseEnv({ ...process.env, NODE_ENV: 'test', LOG_LEVEL: 'silent' });
-const target = new URL(config.DATABASE_URL);
-if (target.hostname !== '127.0.0.1' || !['5434', '5435'].includes(target.port) || target.pathname !== '/timetable_admin') throw new Error('Readiness test only targets local capstone database');
+const databaseUrl = testDatabaseUrl(); // loads .env before process.env is read below
+const config = parseEnv({ ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: 'test', LOG_LEVEL: 'silent' });
 const prisma = createPrisma(config.DATABASE_URL);
 const logger = pino({ level: 'silent' });
 afterAll(() => prisma.$disconnect());
