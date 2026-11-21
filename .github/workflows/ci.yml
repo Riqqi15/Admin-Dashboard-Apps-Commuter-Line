@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: admin_backend
+          POSTGRES_PASSWORD: ci-throwaway-password
+          POSTGRES_DB: timetable_admin
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U admin_backend -d timetable_admin"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Write CI environment (throwaway values, never printed)
+        run: |
+          {
+            echo "NODE_ENV=development"
+            echo "HOST=127.0.0.1"
+            echo "PORT=3000"
+            echo "CORS_ORIGIN=http://localhost:5173"
+            echo "DATABASE_URL=postgresql://admin_backend:ci-throwaway-password@127.0.0.1:5434/timetable_admin"
+            echo "SESSION_PEPPER=$(openssl rand -hex 32)"
+            echo "PII_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - run: npm run prisma:generate
+      - run: npm run prisma:migrate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run postman:validate
+      - run: npm run postman:admin
+      - run: npm run postman:camera
+      # Same flags as the production image install (Dockerfile): Prisma CLI and its tooling are not shipped.
+      - run: npm audit --omit=dev --omit=optional --audit-level=high
+      - run: docker build --target runtime -t timetable-admin-backend:ci .
