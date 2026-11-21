@@ -6,7 +6,7 @@ async function main() {
   const config = parseEnv(process.env);
   const db = createPrisma(config.DATABASE_URL);
   try {
-    const result = await runRetention(db);
+    const result = await runRetention(db, new Date(), { dryRun: process.argv.includes('--dry-run') });
     console.info(JSON.stringify({ job: 'retention', ...result }));
   } finally {
     await db.$disconnect();

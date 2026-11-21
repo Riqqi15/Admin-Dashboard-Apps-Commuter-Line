@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { runRetention } from '../../src/workers/retention-job';
+import { retentionLockKey, runRetention } from '../../src/workers/retention-job';
 import { adminFixture } from '../helpers/admin-api';
 import { alertFixture } from '../helpers/camera-api';
 
@@ -100,5 +100,73 @@ describe('Retention worker (runRetention against the isolated test database)', (
     expect(await f.db.adminUser.count({ where: { id: { in: userIds } } })).toBe(3);
     const statsAfter = await f.db.dailyUsageStat.findMany({ where: { stationId: { in: stationIds } }, orderBy: { id: 'asc' } });
     expect(statsAfter).toEqual(statsBefore);
+  });
+});
+
+describe('Retention worker safety', () => {
+  const runAudits = () => f.db.auditLog.count({ where: { action: 'RETENTION_RUN' } });
+
+  it('dry run reports exactly what a real run then deletes, and changes nothing', async () => {
+    const expired = await alertFixture(f);
+    await f.db.alert.update({ where: { id: expired.alertId }, data: { expiresAt: daysAgo(1) } });
+    const old = await alertFixture(f);
+    await f.db.alert.update({ where: { id: old.alertId }, data: { createdAt: daysAgo(8) } });
+    const auditsBefore = await runAudits();
+
+    const dry = await runRetention(f.db, new Date(), { dryRun: true });
+
+    expect(dry).toMatchObject({ dryRun: true, skipped: false });
+    expect(dry.deleted['expired alerts']).toBeGreaterThanOrEqual(1);
+    expect(dry.purgedAlertPii).toBeGreaterThanOrEqual(1);
+    expect(await f.db.alert.findUnique({ where: { id: expired.alertId } })).not.toBeNull();
+    expect((await f.db.alert.findUniqueOrThrow({ where: { id: old.alertId } })).userNameCiphertext).not.toBeNull();
+    expect(await runAudits()).toBe(auditsBefore);
+
+    const real = await runRetention(f.db);
+    expect(real).toMatchObject({ dryRun: false, skipped: false, purgedAlertPii: dry.purgedAlertPii, deleted: dry.deleted });
+    expect(await f.db.alert.findUnique({ where: { id: expired.alertId } })).toBeNull();
+  });
+
+  it('skips without touching data or audit when another run holds the lock', async () => {
+    const expired = await alertFixture(f);
+    await f.db.alert.update({ where: { id: expired.alertId }, data: { expiresAt: daysAgo(1) } });
+    const auditsBefore = await runAudits();
+
+    const skipped = await f.db.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${retentionLockKey}::bigint)`;
+      return runRetention(f.db);
+    });
+
+    expect(skipped).toEqual({ dryRun: false, skipped: true, purgedAlertPii: 0, deleted: {} });
+    expect(await f.db.alert.findUnique({ where: { id: expired.alertId } })).not.toBeNull();
+    expect(await runAudits()).toBe(auditsBefore);
+    expect((await runRetention(f.db)).skipped).toBe(false);
+  });
+
+  it('records one RETENTION_RUN audit row with counts only and no passenger data', async () => {
+    const fixture = await alertFixture(f);
+    await f.db.alert.update({ where: { id: fixture.alertId }, data: { createdAt: daysAgo(8) } });
+    const auditsBefore = await runAudits();
+
+    const result = await runRetention(f.db);
+
+    expect(await runAudits()).toBe(auditsBefore + 1);
+    const row = await f.db.auditLog.findFirstOrThrow({ where: { action: 'RETENTION_RUN' }, orderBy: { createdAt: 'desc' } });
+    expect(row).toMatchObject({ actorAdminUserId: null, entityType: 'retention', entityId: null, stationId: null });
+    expect(row.details).toEqual({ purgedAlertPii: result.purgedAlertPii, deleted: result.deleted });
+    expect(JSON.stringify(row)).not.toMatch(/Fixture Passenger|081234567890|Ciphertext/);
+    expect(row.expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 86400000);
+  });
+
+  it('detaches a purged alert from the passenger record but keeps newer alerts linked', async () => {
+    const old = await alertFixture(f);
+    const recent = await alertFixture(f);
+    expect((await f.db.alert.findUniqueOrThrow({ where: { id: old.alertId } })).trackedUserId).not.toBeNull();
+    await f.db.alert.update({ where: { id: old.alertId }, data: { createdAt: daysAgo(8) } });
+
+    await runRetention(f.db);
+
+    expect((await f.db.alert.findUniqueOrThrow({ where: { id: old.alertId } })).trackedUserId).toBeNull();
+    expect((await f.db.alert.findUniqueOrThrow({ where: { id: recent.alertId } })).trackedUserId).not.toBeNull();
   });
 });
