@@ -87,5 +87,40 @@ services:
       - ALL
     stop_grace_period: 15s
     restart: unless-stopped
+
+  # Daily data-retention run (7-day PII/session purge, 30-day alert/audit deletion). Same image as the API;
+  # a PostgreSQL advisory lock inside the job prevents overlapping runs. A failed run is logged and retried next interval.
+  retention:
+    image: timetable-admin-backend:local
+    init: true
+    command: ["sh", "-c", "while true; do node dist/workers/retention.js || echo retention run failed; sleep ${RETENTION_INTERVAL_SECONDS:-86400}; done"]
+    # The image's HEALTHCHECK probes the API port; this container runs no server.
+    healthcheck:
+      disable: true
+    logging: *bounded-logs
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    environment:
+      NODE_ENV: ${DOCKER_API_NODE_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Run npm run setup:local first}:${POSTGRES_PASSWORD:?Run npm run setup:local first}@db:5432/${POSTGRES_DB:?Run npm run setup:local first}
+      SESSION_PEPPER: ${SESSION_PEPPER:?Run npm run setup:local first}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:?Run npm run setup:local first}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Run npm run setup:local first}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16777216
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 15s
+    restart: unless-stopped
 volumes:
   admin_db_data:
