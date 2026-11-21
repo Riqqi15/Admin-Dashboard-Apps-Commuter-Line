@@ -9,7 +9,7 @@ import { requireCsrf } from '../../middleware/require-csrf';
 import { authService, tokenHash } from './auth.service';
 import { changePasswordSchema, loginSchema } from './auth.schema';
 
-export const cookieOptions = (config: Env): CookieOptions => ({ httpOnly: true, secure: config.NODE_ENV === 'production', sameSite: 'strict', path: '/api/v1' });
+const cookieOptions = (config: Env): CookieOptions => ({ httpOnly: true, secure: config.NODE_ENV === 'production', sameSite: 'strict', path: '/api/v1' });
 
 export function authRouter(db: PrismaClient, config: Env) {
   const router = Router();
