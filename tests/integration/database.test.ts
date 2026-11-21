@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createPrisma } from '../../src/lib/prisma';
+import { createPrisma } from '../../src/shared/infrastructure/prisma';
 import type { Prisma } from '../../src/generated/prisma/client';
 import { testDatabaseUrl } from '../helpers/test-db';
 

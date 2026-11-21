@@ -3,7 +3,7 @@ import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
-import { createPrisma } from '../../src/lib/prisma';
+import { createPrisma } from '../../src/shared/infrastructure/prisma';
 import { testDatabaseUrl } from '../helpers/test-db';
 
 const databaseUrl = testDatabaseUrl(); // loads .env before process.env is read below

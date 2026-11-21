@@ -1,5 +1,5 @@
-import { createPrisma } from '../src/lib/prisma';
-import { seedDemo } from '../src/lib/seed';
+import { createPrisma } from '../src/shared/infrastructure/prisma';
+import { seedDemo } from '../src/shared/infrastructure/seed';
 
 async function main() {
   if (process.env.NODE_ENV !== 'development') throw new Error('Demo seed requires development mode');

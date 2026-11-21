@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { verify } from 'argon2';
 import { afterAll, describe, expect, it } from 'vitest';
-import { createPrisma } from '../../src/lib/prisma';
-import { seedDemo } from '../../src/lib/seed';
+import { createPrisma } from '../../src/shared/infrastructure/prisma';
+import { seedDemo } from '../../src/shared/infrastructure/seed';
 import { testDatabaseUrl } from '../helpers/test-db';
 
 const prisma = createPrisma(testDatabaseUrl());

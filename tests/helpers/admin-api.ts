@@ -4,7 +4,7 @@ import { argon2id, hash } from 'argon2';
 import request from 'supertest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
-import { createPrisma } from '../../src/lib/prisma';
+import { createPrisma } from '../../src/shared/infrastructure/prisma';
 import { testDatabaseUrl } from './test-db';
 
 loadEnvFile('.env');

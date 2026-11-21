@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
-import { tokenHash } from '../../src/features/auth/auth.service';
+import { hmacTokenService } from '../../src/shared/infrastructure/hmac-token-service';
 import type { PrismaClient } from '../../src/generated/prisma/client';
 import { adminFixture } from '../helpers/admin-api';
 import { alertFixture } from '../helpers/camera-api';
@@ -26,7 +26,7 @@ describe('Alert transaction races', () => {
     const fixture = await alertFixture(f);
     const handler = await f.login(f.securityA.username);
     const admin = await f.login();
-    const session = await f.db.adminSession.findUniqueOrThrow({ where: { tokenHash: tokenHash(f.config, 'session', handler.cookie.split('=')[1]!) } });
+    const session = await f.db.adminSession.findUniqueOrThrow({ where: { tokenHash: hmacTokenService(f.config.SESSION_PEPPER).hash('session', handler.cookie.split('=')[1]!) } });
     let resume!: () => void;
     let reached!: () => void;
     const barrier = new Promise<void>(resolve => { resume = resolve; });

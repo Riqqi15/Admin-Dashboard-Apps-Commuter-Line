@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decryptPii, encryptPii } from '../../src/lib/pii';
+import { decryptPii, encryptPii } from '../../src/shared/infrastructure/aes-pii-cipher';
 
 describe('Versioned authenticated PII encryption', () => {
   it('uses independent random IVs and binds ciphertext to record and field', () => {

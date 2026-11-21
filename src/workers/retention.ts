@@ -1,5 +1,5 @@
 import { parseEnv } from '../config/env';
-import { createPrisma } from '../lib/prisma';
+import { createPrisma } from '../shared/infrastructure/prisma';
 import { runRetention } from './retention-job';
 
 async function main() {

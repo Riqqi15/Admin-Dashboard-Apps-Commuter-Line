@@ -6,7 +6,7 @@ const code = `
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const argon = require('argon2');
-const { createPrisma } = require('./dist/lib/prisma.js');
+const { createPrisma } = require('./dist/shared/infrastructure/prisma.js');
 assert.notEqual(process.getuid(), 0, 'API must not run as root');
 for (const path of ['.env', '.env.seed.local', '.git', '.local', 'prisma/seed.ts', 'node_modules/prisma', 'node_modules/newman', 'node_modules/typescript', 'node_modules/tsx', 'node_modules/vitest', 'node_modules/supertest']) {
   assert.equal(fs.existsSync(path), false, 'Unexpected runtime artifact: ' + path);

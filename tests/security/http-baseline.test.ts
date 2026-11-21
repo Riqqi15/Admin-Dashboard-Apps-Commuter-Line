@@ -5,7 +5,8 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app';
 import { parseEnv } from '../../src/config/env';
-import { errorHandler } from '../../src/http/error-handler';
+import { createErrorHandler } from '../../src/shared/presentation/error-handler';
+import { translatePrismaError } from '../../src/shared/infrastructure/prisma-errors';
 import { Prisma } from '../../src/generated/prisma/client';
 import { expectError } from '../helpers/expect-error';
 
@@ -78,7 +79,7 @@ describe('HTTP security baseline', () => {
     for (const [code, status, expected] of cases) {
       const errorApp = express();
       errorApp.get('/prisma', () => { throw new Prisma.PrismaClientKnownRequestError('constraint "secret_fk" violated on table admin_users', { code, clientVersion: 'test' }); });
-      errorApp.use(errorHandler);
+      errorApp.use(createErrorHandler(translatePrismaError));
       const result = await request(errorApp).get('/prisma');
       expectError(result, status, expected);
       expect(result.text).not.toMatch(/secret_fk|admin_users|constraint/);
@@ -88,7 +89,7 @@ describe('HTTP security baseline', () => {
   it('redacts unexpected errors even when runtime mode is development', async () => {
     const errorApp = express();
     errorApp.get('/boom', () => { throw new Error('db-password-must-stay-private'); });
-    errorApp.use(errorHandler);
+    errorApp.use(createErrorHandler(translatePrismaError));
     const result = await request(errorApp).get('/boom');
     expect(result.status).toBe(500);
     expect(result.body).toEqual({ success: false, error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred' } });

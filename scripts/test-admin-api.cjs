@@ -6,8 +6,8 @@ const { resolve } = require('node:path');
 const newman = require('newman');
 const { createApp } = require('../dist/app');
 const { parseEnv } = require('../dist/config/env');
-const { createPrisma } = require('../dist/lib/prisma');
-const { hashPassword } = require('../dist/lib/password');
+const { createPrisma } = require('../dist/shared/infrastructure/prisma');
+const { hashPassword } = require('../dist/shared/infrastructure/argon2-password-hasher');
 const camera = process.argv.includes('--camera');
 
 async function main() {

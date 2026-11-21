@@ -1,8 +1,8 @@
 import { createServer } from 'node:http';
 import { createApp } from './app';
 import { parseEnv } from './config/env';
-import { createPrisma } from './lib/prisma';
-import { createLogger } from './http/request-context';
+import { createPrisma } from './shared/infrastructure/prisma';
+import { createLogger } from './shared/presentation/request-context';
 
 try {
   const config = parseEnv(process.env);

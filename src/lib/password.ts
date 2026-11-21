@@ -1,3 +1,0 @@
-import { argon2id, hash } from 'argon2';
-
-export const hashPassword = (password: string) => hash(password, { type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 1 });

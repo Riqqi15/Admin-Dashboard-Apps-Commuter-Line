@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
-import { AppError } from '../../src/http/errors';
-import { createAlertStream, type AlertStreamEvent } from '../../src/features/alerts/alert-stream';
-import type { AuthContext } from '../../src/features/auth/auth.service';
+import type { AppError } from '../../src/shared/domain/errors';
+import { createAlertStream } from '../../src/features/alerts/infrastructure/in-memory-alert-stream';
+import type { AlertEvent } from '../../src/features/alerts/domain/alert-event';
+import type { AuthContext } from '../../src/shared/domain/roles';
 
 const auth = (overrides: Partial<AuthContext> = {}): AuthContext => ({
   sessionId: randomUUID(), userId: randomUUID(), username: 'u', role: 'SUPER_ADMIN', stationId: null,
@@ -13,7 +14,7 @@ const fakeResponse = (state: { destroyed?: boolean; writableEnded?: boolean; wri
   const response = { destroyed: state.destroyed ?? false, writableEnded: state.writableEnded ?? false, write: vi.fn((_chunk: string) => state.writeResult ?? true), end: vi.fn() };
   return response as unknown as Response & typeof response;
 };
-const event: AlertStreamEvent = { type: 'alert.created', alertId: randomUUID(), stationId: randomUUID(), status: 'NEW', occurredAt: new Date().toISOString() };
+const event: AlertEvent = { type: 'alert.created', alertId: randomUUID(), stationId: randomUUID(), status: 'NEW', occurredAt: new Date().toISOString() };
 
 describe('alert stream hub', () => {
   it('refuses the 501st subscriber globally and frees a slot on unsubscribe', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { failureState, assertAlertTransition } from '../../src/features/alerts/alert-state';
+import { failureState, assertAlertTransition } from '../../src/features/alerts/domain/alert-state';
 
 describe('Camera failure and alert states', () => {
   it('creates an immediate camera-init alert and a threshold alert after three consecutive analysis failures', () => {
