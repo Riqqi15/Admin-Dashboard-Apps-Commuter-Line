@@ -17,6 +17,30 @@ Hasil aktual:
 
 Pemeriksaan host Windows sebelumnya juga lulus, tetapi bukti di atas berasal dari container Linux yang benar-benar berjalan. Endpoint bisnis, seed demo Docker, dan release gate penuh belum selesai.
 
+## Verifikasi ulang 21 November 2026
+
+Docker Engine 29.7.2, image dibangun ulang dari source terbaru (SSE, analytics, retensi, OpenAPI, audit penolakan) dan stack dijalankan ulang dengan `npm run docker:up`; named volume `admin_db_data` dipertahankan.
+
+- `migrate` keluar dengan kode 0; `db` dan `api` Healthy.
+- `npm run postman:docker`: 7 assertion lulus (health/readiness).
+- `npm run test:docker`: **105 tes pada 22 file lulus** terhadap `127.0.0.1:5435/timetable_admin_test`. `pretest` membuat dan memigrasi database `_test` di container; database `timetable_admin` tidak dipakai tes.
+- `node scripts/check-docker-runtime.cjs`: non-root, tanpa secret/tooling dev, sembilan model terbaca, Argon2id berfungsi, root filesystem read-only.
+- Isi image runtime hanya `dist`, `node_modules`, dan `package.json`: tanpa `scripts/` (simulator, seed) dan tanpa Prisma CLI. `GET /api/v1/openapi.json` menjawab 200 pada Compose lokal (development); mode production tidak menyajikannya (`tests/integration/openapi.test.ts`).
+
+## Batas resource
+
+Agar Docker tidak menghabiskan penyimpanan dan memori laptop, `docker-compose.yml` memasang batas yang memang bisa diatur pada level Compose. Nilai terukur: api ±70 MiB dan db ±39 MiB saat idle.
+
+| Layanan | Memori | CPU | Proses | Lainnya |
+|---|---|---|---|---|
+| `db` | 512 MiB | 1 | 200 | `shm_size` 64 MiB |
+| `api` | 384 MiB | 1 | 128 | tmpfs `/tmp` 16 MiB, root read-only |
+| `migrate` | 384 MiB | 1 | 128 | satu kali jalan, exit 0 terverifikasi |
+
+Log container dirotasi (`json-file`, 5 MB × 3 file, maksimal 15 MB per container). Ini satu-satunya data tulis tak terbatas pada container ini.
+
+Yang **tidak** bisa dibatasi dari Compose: kuota disk named volume atau penyimpanan lapisan image (`storage_opt` hanya untuk driver tertentu dan tidak tersedia di Docker Desktop). Ukuran disk virtual Docker Desktop diatur dari **Settings → Resources**, di luar repository ini. Pada 21 November pemakaian terbesar adalah image 6,0 GB (4,0 GB reclaimable) dan build cache 4,4 GB, sedangkan volume hanya 155 MB. Image dan cache ini milik semua proyek Docker di mesin, jadi tidak dihapus otomatis. Pembersihan manual yang aman untuk proyek ini: `docker builder prune` (build cache) dan `docker image prune` (image tanpa tag), keduanya tidak menyentuh volume atau container yang berjalan.
+
 ## Yang disiapkan
 
 - `Dockerfile`: tahap dependency/build, image migration terpisah, dan runtime API sebagai user non-root `node`.
@@ -76,6 +100,6 @@ The file cannot be accessed by the system.
 
 Metadata read-only menunjukkan objek tersebut berukuran 0 byte dengan atribut `ReparsePoint`. Ini belum membuktikan penyebab awal kerusakannya. Kegagalan sejenis juga dilaporkan pada [issue Docker Desktop](https://github.com/docker/desktop-feedback/issues/675).
 
-Pada 10 November, setelah pengguna membuka kembali Docker Desktop, bagian Server tersedia dan build/run berhasil. Tidak diasumsikan tindakan pemulihan spesifik yang dilakukan pengguna. Agen tidak melakukan factory reset, menghapus socket, mengubah ACL, menghentikan WSL global, atau menghapus volume. Bila kendala muncul kembali, gunakan [troubleshooting Docker Desktop](https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/) dengan menjaga data yang sudah ada.
+Pada 10 November (dan kembali aktif pada 21 November), setelah pengguna membuka kembali Docker Desktop, bagian Server tersedia dan build/run berhasil. Tidak diasumsikan tindakan pemulihan spesifik yang dilakukan pengguna. Agen tidak melakukan factory reset, menghapus socket, mengubah ACL, menghentikan WSL global, atau menghapus volume. Bila kendala muncul kembali, gunakan [troubleshooting Docker Desktop](https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/) dengan menjaga data yang sudah ada.
 
 Audit/release gate penuh belum selesai; detail dependency development yang masih terbuka ada di [dependency-audit](dependency-audit.md). Image dan Compose ini belum dinyatakan siap deployment publik.

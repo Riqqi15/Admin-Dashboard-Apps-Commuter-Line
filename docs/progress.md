@@ -1,5 +1,13 @@
 # Progress backend — 21 November 2026
 
+## Release gate: audit penolakan, CI, Docker, checklist
+
+- Akses alert lintas stasiun (baca, claim, resolve) yang ditolak kini tercatat sebagai `ALERT_ACCESS_DENIED` di audit log, ditulis di luar transaksi yang di-rollback. Respons klien tetap 404 identik dengan alert yang tidak ada. `tests/integration/audit.test.ts` (4 tes) juga membuktikan aksi auth/stasiun/staff/alert tercatat dengan actor dan stasiun yang benar serta tanpa secret/PII.
+- `.github/workflows/ci.yml`: PostgreSQL 18, migration, typecheck, `npm test`, build, Newman admin/kamera, `npm audit --omit=dev --omit=optional --audit-level=high`, dan build image runtime. Belum pernah berjalan di GitHub; run pertama menjadi bukti.
+- Docker dibangun ulang dan diverifikasi (105 tes terhadap DB Docker, runtime check lulus) dengan batas memori/CPU/proses dan rotasi log di `docker-compose.yml`. Lihat [docker.md](docker.md).
+- `npm audit --omit=dev` menemukan 3 High (`effect` via Prisma CLI) yang tidak ada pada image runtime; audit dengan flag instalasi produksi 0 temuan. Lihat [dependency-audit.md](dependency-audit.md).
+- Security checklist dicentang hanya untuk item yang punya bukti; sisanya tetap terbuka beserta alasannya (Helmet/CSP deployment, HTTPS, kredensial mobile, re-identifikasi statistik, CI hijau).
+
 ## Database test terpisah, OpenAPI, dan simulator
 
 - Vitest dan Newman kini memakai database `timetable_admin_test` di server yang sama; `npm run db:test:setup` (otomatis lewat `pretest`) membuatnya dan menjalankan migration, tanpa DROP. Helper `tests/helpers/test-db.ts` menolak URL selain database test. Baris database demo terbukti tidak berubah setelah seluruh run.
@@ -114,11 +122,10 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Tasks 11-12: acceptance Postman penuh, CI dan release gate.
-- Docker image rebuild dengan SSE/analytics/retention/OpenAPI terbaru dan uji `test:docker`.
-- Tes audit per aksi (login, staff, claim/resolve, penolakan lintas stasiun).
+- Run pertama CI di GitHub, lalu centang item CI di security checklist bila hijau.
+- Deployment (TLS/HTTPS, proxy, Helmet/CSP sesuai target) dan mekanisme token tepercaya untuk ingest mobile.
 - Menjalankan `npm run retention` terhadap data demo hanya setelah data diperiksa.
 
-Endpoint ingest simulator dan REST alert tersedia secara lokal; integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Checkpoint A sudah digabung dan dipush ke `main` pada merge `0f8e21a`; perubahan auth dan kamera/alert berikutnya masih lokal sampai ada instruksi push.
+Integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Seluruh Task 1–10 sudah ada di `main`; perubahan release gate (audit penolakan, CI, batas Docker, dokumen bukti) masih lokal sampai ada instruksi commit/push.
 
 Lihat [README](../README.md) untuk perintah setup, serta [implementation plan](superpowers/plans/2026-10-28-timetable-admin-backend-mvp.md).

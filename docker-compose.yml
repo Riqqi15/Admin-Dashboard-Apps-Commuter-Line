@@ -1,7 +1,18 @@
 name: timetable-admin-capstone
+# Container logs are the only unbounded writable data here: rotate at 5 MB x 3 files (15 MB max per container).
+x-logging: &bounded-logs
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "3"
 services:
   db:
     image: postgres:17-alpine
+    logging: *bounded-logs
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 200
+    shm_size: 64m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Run npm run setup:local first}
       POSTGRES_USER: ${POSTGRES_USER:?Run npm run setup:local first}
@@ -23,6 +34,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: migrate
+    logging: *bounded-logs
+    mem_limit: 384m
+    cpus: 1.0
+    pids_limit: 128
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:?Run npm run setup:local first}:${POSTGRES_PASSWORD:?Run npm run setup:local first}@db:5432/${POSTGRES_DB:?Run npm run setup:local first}
@@ -42,6 +57,10 @@ services:
       dockerfile: Dockerfile
       target: runtime
     init: true
+    logging: *bounded-logs
+    mem_limit: 384m
+    cpus: 1.0
+    pids_limit: 128
     environment:
       NODE_ENV: ${DOCKER_API_NODE_ENV:-development}
       HOST: 0.0.0.0

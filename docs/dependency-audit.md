@@ -11,7 +11,17 @@ Snapshot hasil pemeriksaan lokal, bukan jaminan bebas kerentanan.
 
 Tidak dilakukan `npm audit fix --force` atau downgrade otomatis ke Newman versi lama. Override perlu dipertahankan hanya sampai upstream memakai versi patched dan diuji ulang ketika dependency diperbarui.
 
-## Hasil
+## Pembaruan 21 November 2026
+
+Audit ulang dengan advisory terbaru:
+
+- `npm audit --omit=dev --omit=optional` (flag yang sama dengan instalasi image produksi di `Dockerfile`): **0 vulnerabilities**, exit 0. Ini yang dipakai gate CI.
+- `npm audit --omit=dev`: **3 High**, exit 1 — `effect <=3.22.0` ([GHSA-7589-6fvf-x4pw](https://github.com/advisories/GHSA-7589-6fvf-x4pw), ReDoS pada regex `Schema.TemplateLiteral`), terpasang `effect@3.20.0` lewat `prisma@7.10.1` → `@prisma/config`. Paket `prisma` ada karena peer opsional `@prisma/client`.
+- Triase reachability: `effect` dan `prisma` **tidak ada** pada image runtime (diperiksa dengan `ls node_modules` di container). API tidak mengimpor `effect`; hanya Prisma CLI (migration/generate pada mesin/CI/build dengan schema milik repository ini) yang memuatnya, tanpa input pengguna. Dampak runtime: tidak terjangkau.
+- Tidak dilakukan `npm audit fix --force` (akan menurunkan Prisma ke 6.12.0, perubahan breaking). Pantau rilis Prisma yang memperbarui `effect`; setelah itu perbarui `prisma`/`@prisma/client` bersamaan dan jalankan ulang seluruh tes.
+- `npm audit` lengkap: **19 temuan** (13 High, 6 Moderate, 0 Critical), seluruhnya pada tooling development (Newman/Postman dan Prisma CLI).
+
+## Hasil (9 November 2026, dipertahankan sebagai riwayat)
 
 `npm audit --omit=dev`: **0 vulnerabilities**, exit 0.
 

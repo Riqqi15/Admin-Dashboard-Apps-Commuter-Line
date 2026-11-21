@@ -3,7 +3,7 @@
 ## Bukti lokal 21 November 2026
 
 - **Database test terpisah:** semua tes vitest dan Newman memakai `timetable_admin_test` (dibuat/dimigrasi oleh `npm run db:test:setup` pada `pretest`). Jumlah baris database demo identik sebelum dan sesudah seluruh run.
-- `npm test`: **101 tes pada 21 file**, termasuk auth/stasiun, ingest, crypto PII, REST alert, race, SSE stream, analytics, daily stats, retention, dan OpenAPI.
+- `npm test`: **105 tes pada 22 file**, termasuk auth/stasiun, ingest, crypto PII, REST alert, race, SSE stream, analytics, daily stats, retention, OpenAPI, dan audit (aksi auth/stasiun/staff/alert, penolakan lintas stasiun, tanpa secret). Suite yang sama lulus terhadap PostgreSQL Docker (`npm run test:docker`).
 - Retention kini memanggil worker asli (`runRetention` di `src/workers/retention-job.ts`), bukan salinan SQL: alert/audit kedaluwarsa, sesi admin kedaluwarsa/dicabut, PII 7 hari, urutan FK event → sesi → tracked user, idempotensi, serta stasiun/akun/statistik tidak terhapus.
 - OpenAPI: dokumen sama persis dengan route terpasang, semua `$ref` ter-resolve, CSRF wajib pada setiap mutasi, tidak disajikan di production, tanpa secret.
 - Simulator (`npm run simulate`) diuji manual terhadap API lokal pada database test: `three-consecutive-failures` membuat tepat satu alert, `camera-init-failed` membuat alert segera, replay `duplicate-event` 200 tanpa menambah counter.
@@ -18,7 +18,7 @@
 - Daily stats: increment session/uniqueUser, no double-count same user same day, failedSessionCount pada transisi FAILED pertama, alertCount/resolvedAlertCount, averageResponseSeconds, duplikat event idempoten, independensi per stasiun.
 - Retention: hapus alert/audit/sesi kedaluwarsa, PII purge tanpa hapus alert, PII purge idempoten, urutan FK (events sebelum sessions), preservasi stasiun/akun/stats, hapus tracked user setelah sesi dihapus.
 
-Daftar skenario berikut tetap menjadi target acceptance lengkap. Deployment Docker terbaru (termasuk `npm run test:docker` dengan database `_test` di port 5435) belum dibuktikan oleh hasil pengujian; pengujian audit-log per aksi (login, staff, claim/resolve, akses lintas stasiun ditolak) belum lengkap.
+Daftar skenario berikut tetap menjadi target acceptance lengkap. Docker terbaru dan `test:docker` dengan database `_test` terbukti pada 21 November (lihat `docs/docker.md`). Yang belum dibuktikan: run CI pertama di GitHub dan deployment internet (TLS, proxy, multi-instance).
 
 ## 1. Tujuan
 
