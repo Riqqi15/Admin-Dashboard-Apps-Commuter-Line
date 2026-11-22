@@ -39,6 +39,66 @@
               }
             }
           ]
+        },
+        {
+          "name": "Check Liveness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}/health/live",
+            "description": "Alias liveness /health/live; tidak menyentuh database."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Liveness response sesuai kontrak\", () => pm.expect(pm.response.json()).to.eql({success: true, data: {status: \"ok\"}}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get OpenAPI Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/openapi.json",
+            "description": "Dokumen OpenAPI; hanya tersedia di luar production."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"OpenAPI 3 dengan path alerts\", () => { const d = pm.response.json(); pm.expect(d.openapi).to.match(/^3./); pm.expect(d.paths).to.have.property(\"/api/v1/alerts\"); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -448,6 +508,36 @@
           ]
         },
         {
+          "name": "List Staff by Station",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/staff?stationId={{managedStationId}}&page=1&pageSize=5",
+            "description": "Filter stasiun dan pagination; setiap item milik stasiun yang diminta dan memuat lastLoginAt."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Hanya staff stasiun terpilih\", () => { const d = pm.response.json().data; pm.expect(d.items.length).to.be.above(0); pm.expect(d.items.every(u => u.stationId === pm.environment.get(\"managedStationId\"))).to.eql(true); pm.expect(d.items[0]).to.have.property(\"lastLoginAt\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Update Staff",
           "request": {
             "method": "PATCH",
@@ -713,9 +803,9 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
-                "const eventResult = pm.response.json().data;",
-                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(1));",
-                "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
+                  "const eventResult = pm.response.json().data;",
+                  "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(1));",
+                  "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
                 ]
               }
             }
@@ -774,9 +864,9 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
-                "const eventResult = pm.response.json().data;",
-                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(2));",
-                "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
+                  "const eventResult = pm.response.json().data;",
+                  "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(2));",
+                  "pm.test(\"No premature alert\", () => pm.expect(eventResult.alertId).to.eql(null));"
                 ]
               }
             }
@@ -835,10 +925,10 @@
                 "exec": [
                   "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
                   "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
-                "const eventResult = pm.response.json().data;",
-                "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(3));",
-                "pm.test(\"Alert created\", () => pm.expect(eventResult.alertId).to.be.a(\"string\").and.not.empty);",
-                "pm.environment.set(\"alertId\", eventResult.alertId);"
+                  "const eventResult = pm.response.json().data;",
+                  "pm.test(\"Consecutive failure counter\", () => pm.expect(eventResult.consecutiveFailures).to.eql(3));",
+                  "pm.test(\"Alert created\", () => pm.expect(eventResult.alertId).to.be.a(\"string\").and.not.empty);",
+                  "pm.environment.set(\"alertId\", eventResult.alertId);"
                 ]
               }
             }
@@ -925,6 +1015,36 @@
                   "pm.test(\"Success response\", () => pm.expect(pm.response.json().success).to.eql(true));",
                   "pm.test(\"Alert is listed\", () => pm.expect(pm.response.json().data.items.some(a => a.id === pm.environment.get(\"alertId\"))).to.eql(true));",
                   "pm.test(\"No ciphertext in list\", () => pm.expect(pm.response.text()).not.to.include(\"Ciphertext\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Alerts by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{origin}}"
+              }
+            ],
+            "url": "{{baseUrl}}{{apiPath}}/alerts?status=NEW&page=1&pageSize=10",
+            "description": "Filter status NEW dan pagination."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Semua alert berstatus NEW dan alert baru termasuk\", () => { const items = pm.response.json().data.items; pm.expect(items.every(a => a.status === \"NEW\")).to.eql(true); pm.expect(items.some(a => a.id === pm.environment.get(\"alertId\"))).to.eql(true); });"
                 ]
               }
             }

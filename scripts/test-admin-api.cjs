@@ -70,8 +70,8 @@ async function main() {
     const changeStaffPassword = copy('Change Password', 'Change Staff Temporary Password');
     changeStaffPassword.request.body.raw = JSON.stringify({ currentPassword: '{{managedStaffResetPassword}}', newPassword: '{{managedStaffNewPassword}}' });
     const requests = camera ? [
-      copy('Check API Health'), copy('Check Database Connection'), copy('Login as Super Admin'), copy('Get Current User'),
-      ...collection.item.slice(5, 7).flatMap(folder => structuredClone(folder.item)), copy('List Alerts'), copy('Get Alert Details'),
+      copy('Check API Health'), copy('Check Liveness'), copy('Check Database Connection'), copy('Login as Super Admin'), copy('Get Current User'),
+      ...collection.item.slice(5, 7).flatMap(folder => structuredClone(folder.item)), copy('List Alerts'), copy('List Alerts by Status'), copy('Get Alert Details'),
       copy('Logout', 'Logout as Super Admin'), copy('Login as Station A Security'), copy('Allow Own Station Alert Access'),
       copy('Claim Alert'), copy('Resolve Alert'), copy('Logout', 'Logout as Station A Security'), copy('Login as Station B Security'),
       copy('Deny Cross-Station Alert Access'), copy('Deny Cross-Station Alert Update'), copy('Logout', 'Logout as Station B Security'),
