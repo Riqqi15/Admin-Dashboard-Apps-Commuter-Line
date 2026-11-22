@@ -86,8 +86,8 @@ async function main() {
       collection: { ...collection, info: { ...collection.info, name: 'Timetable Admin - Checkpoint ' + (camera ? 'C' : 'B') }, item: [{ name: camera ? 'Camera Failure and Station Assistance' : 'Auth and Station Administration', item: requests }] },
       environment, reporters: ['cli'], timeoutRequest: 5000, bail: true,
     }, (error, summary) => error ? reject(error) : resolveRun(summary)));
-    if (!result || result.run.failures.length || result.run.stats.requests.total !== 22) throw new Error('API workflow failed');
-    console.log('PASS: 22 real HTTP requests; ' + (camera ? 'camera session/event idempotency, failure threshold, scoped alert detail, claim/resolve and cross-station denial.' : 'temporary passwords, station/staff management, scoped access, CSRF propagation and logout.') + ' Fixtures are removed below.');
+    if (!result || result.run.failures.length || result.run.stats.requests.total !== requests.length) throw new Error('API workflow failed');
+    console.log('PASS: ' + requests.length + ' real HTTP requests; ' + (camera ? 'camera session/event idempotency, failure threshold, scoped alert detail, claim/resolve and cross-station denial.' : 'temporary passwords, station/staff management, scoped access, CSRF propagation and logout.') + ' Fixtures are removed below.');
   } finally {
     if (server.listening) await new Promise(resolveClose => server.close(resolveClose));
     // Fixture ownership is a random per-run prefix; seed/demo accounts are never modified.
