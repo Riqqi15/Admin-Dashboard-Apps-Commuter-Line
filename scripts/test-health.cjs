@@ -15,5 +15,5 @@ newman.run({
   timeoutRequest: 5000,
   bail: true,
 }, (error, summary) => {
-  if (error || !summary || summary.run.failures.length || summary.run.stats.requests.total !== 2) process.exitCode = 1;
+  if (error || !summary || summary.run.failures.length || summary.run.stats.requests.total !== health.flatMap(folder => folder.item).length) process.exitCode = 1;
 });
