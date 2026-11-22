@@ -21,6 +21,12 @@ describe('PostgreSQL schema integration (fixtures rolled back)', () => {
     expect(await prisma.$queryRaw<Array<{ value: number }>>`SELECT 1 AS value`).toEqual([{ value: 1 }]);
   });
 
+  it('has dropped the unused admin_sessions.last_seen_at column', async () => {
+    const columns = await prisma.$queryRaw<Array<{ column_name: string }>>`SELECT column_name FROM information_schema.columns WHERE table_name = 'admin_sessions'`;
+    expect(columns.map(c => c.column_name)).not.toContain('last_seen_at');
+    expect(columns.map(c => c.column_name)).toContain('revoked_at');
+  });
+
   it('enforces one station for station security at database level', async () => {
     await rollback(async tx => {
       await expect(tx.adminUser.create({ data: { username: randomUUID(), passwordHash: 'fixture-only', role: 'STATION_SECURITY' } })).rejects.toThrow(/admin_users_role_station_check/);
