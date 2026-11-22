@@ -8,7 +8,8 @@
 - Daftar staff memuat `lastLoginAt`. Kolom `admin_sessions.last_seen_at` yang tidak pernah diperbarui dihapus lewat migration `drop_admin_session_last_seen`.
 - Tes kode error (`expectError`) dan cabang yang sebelumnya tidak terpanggil ditambahkan; coverage terakhir diukur (setelah refactor) 94,67% baris / 89,17% cabang / 96,84% fungsi. Celah yang diketahui: `server.ts`, entry `retention.ts`, cabang revalidasi SSE 30 detik.
 - Dokumen disinkronkan (api-specification, checklist keamanan, threat model, database-design, ERD `.mmd`). ERD `.svg` belum dibuat ulang dari `.mmd`.
-- Verifikasi: **127 tes pada 25 file**, typecheck, build, Postman validate 38 request, Newman admin 22 request/55 asersi dan kamera 22 request/64 asersi lulus.
+- Review akhir: code review (6 temuan; query timeout worker retensi dan log error worker diperbaiki, satu tes flaky diperbaiki) dan security review (tanpa temuan). Postman bertambah 4 request (liveness, OpenAPI, staff per stasiun, alert per status).
+- Verifikasi: **129 tes pada 26 file** (lokal dan PostgreSQL 17 Docker), typecheck, build, `npm audit` produksi 0, runtime check Docker, Postman validate 42 request, Newman admin 25 request/61 asersi dan kamera 24 request/68 asersi lulus. Dry-run retensi pada DB demo: hanya 9 sesi admin kedaluwarsa yang akan dihapus; belum dijalankan sungguhan.
 
 ## Catatan sebelumnya (21 November 2026)
 
