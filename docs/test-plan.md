@@ -7,8 +7,8 @@
 - Retention kini memanggil worker asli (`runRetention` di `src/workers/retention-job.ts`), bukan salinan SQL: alert/audit kedaluwarsa, sesi admin kedaluwarsa/dicabut, PII 7 hari, urutan FK event → sesi → tracked user, idempotensi, serta stasiun/akun/statistik tidak terhapus.
 - OpenAPI: dokumen sama persis dengan route terpasang, semua `$ref` ter-resolve, CSRF wajib pada setiap mutasi, tidak disajikan di production, tanpa secret.
 - Simulator (`npm run simulate`) diuji manual terhadap API lokal pada database test: `three-consecutive-failures` membuat tepat satu alert, `camera-init-failed` membuat alert segera, replay `duplicate-event` 200 tanpa menambah counter.
-- `npm run postman:camera`: 22 request HTTP / 64 assertion. Ambang gagal 1–3, replay identik, detail sesuai scope, claim/resolve serta penolakan lintas stasiun.
-- `npm run postman:admin`: regresi 22 request HTTP / 55 assertion.
+- `npm run postman:camera`: 24 request HTTP / 68 assertion. Ambang gagal 1–3, replay identik, detail sesuai scope, claim/resolve serta penolakan lintas stasiun.
+- `npm run postman:admin`: regresi 25 request HTTP / 61 assertion.
 - `npm run postman:validate`: **38 request / 46 script / 2 Environment**, secret contoh kosong.
 - `npm run typecheck`: lulus tanpa error.
 - Race ingest mencakup UUID berbeda casing, ID event sama lintas sesi, event paralel, counter dan satu alert. Race alert mencakup dua claimant dan pencabutan/pemindahan akun setelah middleware autentikasi.

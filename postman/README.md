@@ -25,7 +25,7 @@ npm run postman:camera
 
 `postman:validate` tidak mengirim request. `postman:admin` otomatis menjalankan build, membuka server HTTP nyata pada port loopback sementara, dan memakai PostgreSQL lokal proyek dari `.env` (hanya port 5434/5435 dan database `timetable_admin`). Script menolak mode production.
 
-Workflow menjalankan **22 request / 55 assertion** dari Collection utama, meliputi:
+Workflow menjalankan **25 request / 61 assertion** dari Collection utama, meliputi:
 
 1. Health dan database readiness.
 2. Login Super Admin dengan sandi sementara, ganti sandi, dan profil.
@@ -43,7 +43,7 @@ Kredensial acak hanya berada di memori; cookie dikelola Newman. Fixture memakai 
 
 ## Workflow kamera sampai bantuan selesai
 
-`npm run postman:camera` membangun source dan menjalankan **22 request HTTP nyata / 64 assertion** melalui Newman:
+`npm run postman:camera` membangun source dan menjalankan **24 request HTTP nyata / 68 assertion** melalui Newman:
 
 1. Health, database, login dan profil Super Admin.
 2. Buat sesi simulator dan ulangi payload yang sama: ID sesi tetap sama.
