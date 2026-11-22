@@ -93,7 +93,7 @@ Body implementasi saat ini (field tambahan ditolak):
 | PATCH `/staff/:id` | Minimal satu dari `username`, `stationId` aktif, `isActive` | 200, `data` petugas |
 | POST `/staff/:id/reset-password` | `newPassword` (12-128 karakter), ditentukan Super Admin | 200, `data` petugas dengan `mustChangePassword=true` |
 
-Staff-management hanya mengelola akun `STATION_SECURITY`. Field `role`, `passwordHash`, dan `mustChangePassword` tidak boleh diatur client. ID akun Super Admin pada route staff mengembalikan scoped 404. Sandi reset tidak dikembalikan oleh API; operator menyimpan sandi yang ia masukkan secara lokal.
+Daftar dan detail staff memuat `lastLoginAt` (null sebelum login pertama). Staff-management hanya mengelola akun `STATION_SECURITY`. Field `role`, `passwordHash`, dan `mustChangePassword` tidak boleh diatur client. ID akun Super Admin pada route staff mengembalikan scoped 404. Sandi reset tidak dikembalikan oleh API; operator menyimpan sandi yang ia masukkan secara lokal.
 
 Petugas mendapat daftar berisi stasiun dari akun terkini di database, tanpa menerima pilihan scope dari client. Penggunaan query `stationId` oleh petugas ditolak 403, termasuk stationId sendiri. Semua route pengelolaan ditolak 403 untuk petugas. Perubahan akun petugas, reset sandi, serta penonaktifan akun/stasiun mencabut sesi yang terdampak. Pemindahan petugas tidak mengubah stasiun pada riwayat alert. Aktivitas login/logout, ganti sandi, serta mutasi stasiun/staff dicatat ke `audit_logs` dalam transaksi tanpa sandi atau token.
 
@@ -160,7 +160,7 @@ Kontrak implementasi ingest (17 November):
 - Event sebelum waktu mulai atau lebih lama dari event terakhir: 409 `EVENT_OUT_OF_ORDER`. Timestamp sama diterima menurut urutan transaksi. Event baru setelah `SESSION_ENDED`: 409 `SESSION_CLOSED`; sesi kedaluwarsa: 410 `SESSION_EXPIRED`.
 - Jenis event: `SESSION_STARTED`, `CAMERA_INIT_FAILED`, `ANALYSIS_FAILED`, `ANALYSIS_RECOVERED`, `SESSION_ENDED`. `errorCode` opsional, hanya pada kegagalan, dari allowlist: `CAMERA_UNAVAILABLE`, `CAMERA_INITIALIZATION_FAILED`, `FRAME_ENCODING_FAILED`, `VISION_TIMEOUT`, `VISION_PROVIDER_UNAVAILABLE`, `NETWORK_TIMEOUT`.
 - Satu sesi maksimal satu alert, termasuk saat request paralel. Kegagalan kritis menandai sesi FAILED; recovery mereset counter tanpa menghapus riwayat kegagalan atau menyelesaikan alert. FAILED belum menutup sesi sampai `SESSION_ENDED` diterima. Tidak ada panggilan/SMS otomatis; API membuat alert untuk ditangani petugas.
-- Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD terpisah per record/field. TTL sesi/event 7 hari dan metadata alert 30 hari ditangani worker retensi lokal; worker belum dijalankan atau dijadwalkan.
+- Nama/telepon dienkripsi AES-256-GCM dengan IV acak dan AAD terpisah per record/field. TTL sesi/event 7 hari dan metadata alert 30 hari dihapus worker retensi yang berjalan otomatis harian sebagai service Compose `retention`.
 
 ## 5. Alerts
 
@@ -175,7 +175,7 @@ Kontrak implementasi ingest (17 November):
 Kontrak REST alert yang tersedia:
 
 - List menerima `page` (default 1), `pageSize` (default 20, maksimal 100), `status` opsional (`NEW`, `ACKNOWLEDGED`, `RESOLVED`), dan `stationId` hanya untuk Super Admin. Petugas mengirim filter stasiun apa pun ditolak 403. Respons `data.items`, `total`, `page`, `pageSize`; daftar tidak memuat nama/telepon/ciphertext.
-- Detail mengembalikan metadata alert dan `user: {displayName, phone}` untuk akses yang sah. Setelah 7 hari sejak alert dibuat, atau snapshot telah dipurge, `user=null`; alert melewati `expiresAt` tidak dapat diakses. Penekanan respons PII ini belum menggantikan worker penghapusan fisik.
+- Detail mengembalikan metadata alert dan `user: {displayName, phone}` untuk akses yang sah. Setelah 7 hari sejak alert dibuat, atau snapshot telah dipurge, `user=null`; alert melewati `expiresAt` tidak dapat diakses. Penghapusan fisik dilakukan worker retensi harian.
 - Acknowledge menerima `{}` atau tanpa body. Handler diambil dari akun aktif, bukan client. Transaksi mengunci row dan memeriksa NEW sehingga hanya satu klaim berhasil; permintaan lain mendapat 409.
 - Resolve menerima `{"notes":"Pengguna telah dibantu"}`, di-trim, 1-1000 karakter. Hanya ACKNOWLEDGED dapat menjadi RESOLVED; handler awal tetap dicatat. Catatan jangan diisi sandi atau data pribadi tambahan.
 - Mutasi memerlukan cookie dan CSRF sesi. Role/stasiun/sesi dibaca ulang dalam transaksi setelah account lock untuk menolak permintaan yang bersamaan dengan pencabutan/pemindahan akun. Akses alert stasiun lain disamarkan sebagai 404.
@@ -208,8 +208,8 @@ Rentang tanggal dibatasi agar query tidak digunakan untuk DoS.
 - `GET /dashboard/summary` hanya menerima `stationId` opsional untuk Super Admin. Petugas mendapat scope dari akun aktif. Hasil memuat ringkasan UTC hari ini dan per stasiun, sesi aktif, serta alert belum selesai.
 - `GET /analytics/usage` menerima `from` dan `to` format `YYYY-MM-DD` (inklusif, default 7 hari terakhir), maksimal 31 hari, serta `stationId` hanya untuk Super Admin. Petugas dengan parameter stationId selalu ditolak. Sumber laporan adalah tabel agregat harian, sehingga tetap tersedia setelah data mentah 7 hari dihapus. Hasil dibatasi 5.000 baris dan memberi `truncated=true` bila batas itu tercapai.
 - Counter agregat diperbarui dalam transaksi sesi/event/alert: sesi, pengguna unik per stasiun per hari, sesi gagal, alert dibuat, alert selesai, dan rerata detik dari alert dibuat sampai diklaim. Hari statistik mengikuti UTC; rerata response dihitung berdasarkan waktu klaim.
-- `GET /audit-logs` hanya untuk Super Admin, halaman default 25/maksimal 100, dengan filter opsional station, action, from, dan to. Response hanya metadata audit; details bebas tidak dikirim.
-- Cleanup worker dapat dijalankan lokal dengan `npm run build` lalu `npm run retention`. Jadwalkan sekali sehari pada deployment; belum ada scheduler bawaan.
+- `GET /audit-logs` hanya untuk Super Admin, halaman default 25/maksimal 100, dengan filter opsional station, action, from, dan to. Response hanya metadata audit; details bebas tidak dikirim. Aksi yang dicatat: `AUTH_LOGIN`, `AUTH_LOGIN_FAILED` (tanpa username/sandi/IP), `AUTH_LOGOUT`, `AUTH_PASSWORD_CHANGED`, `STATION_CREATED/UPDATED`, `STAFF_CREATED/UPDATED/PASSWORD_RESET`, `ALERT_CREATED/ACKNOWLEDGED/RESOLVED`, `ALERT_ACCESS_DENIED`, dan `RETENTION_RUN`.
+- Worker retensi berjalan otomatis sekali sehari sebagai service `retention` di Docker Compose (`RETENTION_INTERVAL_SECONDS`, default 86400), dengan advisory lock anti-jalan-ganda dan audit `RETENTION_RUN`. Manual: `npm run retention`; cek tanpa menghapus: `npm run retention:dry-run`.
 
 ## 7. SSE
 

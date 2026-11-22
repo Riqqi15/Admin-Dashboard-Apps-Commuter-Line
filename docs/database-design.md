@@ -53,7 +53,7 @@ erDiagram
 | 'station_id' | UUID nullable | Wajib bagi 'STATION_SECURITY', harus null bagi 'SUPER_ADMIN' |
 | 'is_active' | boolean | Default true |
 | 'must_change_password' | boolean | Default true untuk akun baru/reset |
-| 'last_login_at' | timestamptz nullable | Opsional |
+| 'last_login_at' | timestamptz nullable | Diisi saat login berhasil; tampil di daftar staff |
 | 'created_at', 'updated_at' | timestamptz | Wajib |
 
 ### 'admin_sessions'
@@ -66,7 +66,9 @@ erDiagram
 | 'csrf_token_hash' | char(64) | Wajib |
 | 'expires_at' | timestamptz | Wajib |
 | 'revoked_at' | timestamptz nullable | Opsional |
-| 'last_seen_at', 'created_at' | timestamptz | Wajib |
+| 'created_at' | timestamptz | Wajib |
+
+Kolom `last_seen_at` pada sesi admin dihapus (migration `drop_admin_session_last_seen`) karena tidak pernah diperbarui. `tracked_users.first_seen_at`/`last_seen_at` dan `camera_events.received_at` dipertahankan sebagai metadata forensik.
 
 ### 'tracked_users'
 

@@ -1,4 +1,16 @@
-# Progress backend — 21 November 2026
+# Progress backend — 26 November 2026
+
+## Sprint hardening: retensi terjadwal, clean architecture, audit login
+
+- Retensi berjalan otomatis sebagai service Compose `retention`: satu transaksi, advisory lock, `--dry-run` yang sama persis dengan run nyata, audit `RETENTION_RUN` berisi jumlah. Log worker kini hanya satu baris JSON akhir (log per langkah dihapus).
+- Backend dipindah ke clean architecture pragmatis per fitur (`domain / application / infrastructure / presentation`); aturan ketergantungan dijaga `tests/unit/architecture.test.ts`. Perilaku API tidak berubah. Lihat [architecture.md](architecture.md).
+- Login gagal dicatat sebagai `AUTH_LOGIN_FAILED` (akun dikenal maupun tidak) tanpa username, sandi, atau IP.
+- Daftar staff memuat `lastLoginAt`. Kolom `admin_sessions.last_seen_at` yang tidak pernah diperbarui dihapus lewat migration `drop_admin_session_last_seen`.
+- Tes kode error (`expectError`) dan cabang yang sebelumnya tidak terpanggil ditambahkan; coverage terakhir diukur (setelah refactor) 94,67% baris / 89,17% cabang / 96,84% fungsi. Celah yang diketahui: `server.ts`, entry `retention.ts`, cabang revalidasi SSE 30 detik.
+- Dokumen disinkronkan (api-specification, checklist keamanan, threat model, database-design, ERD `.mmd`). ERD `.svg` belum dibuat ulang dari `.mmd`.
+- Verifikasi: **127 tes pada 25 file**, typecheck, build, Postman validate 38 request, Newman admin 22 request/55 asersi dan kamera 22 request/64 asersi lulus.
+
+## Catatan sebelumnya (21 November 2026)
 
 ## Release gate: audit penolakan, CI, Docker, checklist
 
@@ -39,8 +51,6 @@ API source belum direstart otomatis oleh perubahan ini; proses lama di port 3002
 - Verifikasi: 16 tes integrasi analytics (scope dashboard summary, parameter stationId, validasi rentang tanggal, default 7 hari, akses audit Super Admin only, filter audit, exclusion details, pagination, penolakan tanpa autentikasi) dan 8 tes daily stats (increment session/uniqueUser, no double-count, failedSessionCount, alertCount/resolvedAlertCount, averageResponseSeconds, duplikat event, independensi per stasiun) lulus.
 - 8 tes integrasi retensi (hapus alert/audit/sesi kedaluwarsa, PII purge tanpa hapus alert, PII purge idempoten, urutan FK, preservasi stasiun/akun/stats, hapus tracked user setelah sesi dihapus) lulus pada database terisolasi.
 - Request Postman analytics/audit tersedia: Dashboard Summary, Usage Statistics, Audit Logs, Audit Logs Filtered, SSE Alert Stream.
-
-## Ingest kamera dan REST alert: Tasks 6–7
 
 ## Ingest kamera dan REST alert: Tasks 6–7
 
@@ -122,9 +132,9 @@ Respons readiness 200 OK juga terlihat langsung di aplikasi Postman. File Enviro
 
 ## Berikutnya
 
-- Run pertama CI di GitHub, lalu centang item CI di security checklist bila hijau.
+- Review kode dan keamanan akhir, dry-run retensi pada data demo (hanya baca), lalu push satu per satu.
 - Deployment (TLS/HTTPS, proxy, Helmet/CSP sesuai target) dan mekanisme token tepercaya untuk ingest mobile.
-- Menjalankan `npm run retention` terhadap data demo hanya setelah data diperiksa.
+- Menjalankan retensi sungguhan terhadap data demo hanya atas izin pemilik data.
 
 Integrasi aplikasi mobile belum dibuka. Repository Timetable milik dosen tidak diubah. Seluruh Task 1–10 sudah ada di `main`; perubahan release gate (audit penolakan, CI, batas Docker, dokumen bukti) masih lokal sampai ada instruksi commit/push.
 
