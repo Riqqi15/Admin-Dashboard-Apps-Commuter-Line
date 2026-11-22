@@ -28,17 +28,26 @@ export function authUseCases(read: AuthRepository, uow: UnitOfWork<AuthRepositor
     async login(username: string, password: string) {
       const candidate = await read.findAccountByUsername(username);
       const valid = await hasher.verify(candidate?.passwordHash ?? await dummyHash, password);
-      if (!candidate || !valid) throw invalidLogin();
-      return uow.run(async ({ auth, audit }) => {
-        // Station-before-user lock order also serializes login with station deactivation.
-        if (candidate.stationId) await auth.lockStationShared(candidate.stationId);
-        await auth.lockUser(candidate.id);
-        const user = await auth.findAccount(candidate.id);
-        if (!user || !accountCanSignIn(user) || user.username !== candidate.username || user.passwordHash !== candidate.passwordHash || user.stationId !== candidate.stationId) throw invalidLogin();
-        await auth.recordLogin(user.id, new Date());
-        await audit.record({ actorId: user.id, action: 'AUTH_LOGIN', entityType: 'admin_user', entityId: user.id, stationId: user.stationId });
-        return createSession(auth, user);
-      });
+      try {
+        if (!candidate || !valid) throw invalidLogin();
+        return await uow.run(async ({ auth, audit }) => {
+          // Station-before-user lock order also serializes login with station deactivation.
+          if (candidate.stationId) await auth.lockStationShared(candidate.stationId);
+          await auth.lockUser(candidate.id);
+          const user = await auth.findAccount(candidate.id);
+          if (!user || !accountCanSignIn(user) || user.username !== candidate.username || user.passwordHash !== candidate.passwordHash || user.stationId !== candidate.stationId) throw invalidLogin();
+          await auth.recordLogin(user.id, new Date());
+          await audit.record({ actorId: user.id, action: 'AUTH_LOGIN', entityType: 'admin_user', entityId: user.id, stationId: user.stationId });
+          return createSession(auth, user);
+        });
+      } catch (error) {
+        // The failed transaction rolled back, so the failure is recorded on its own.
+        // Known and unknown usernames both write one row, keeping the work uniform; no username, password or IP is stored.
+        if (error instanceof AppError && error.code === 'INVALID_CREDENTIALS') {
+          await uow.run(({ audit }) => audit.record({ actorId: null, action: 'AUTH_LOGIN_FAILED', entityType: 'admin_user', entityId: candidate?.id ?? null, stationId: candidate?.stationId ?? null }));
+        }
+        throw error;
+      }
     },
 
     async logout(actor: AuthContext) {

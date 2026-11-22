@@ -3,6 +3,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { adminFixture, cookieOf, fixturePassword } from '../helpers/admin-api';
 import { alertFixture } from '../helpers/camera-api';
+import { expectError } from '../helpers/expect-error';
 
 let f: Awaited<ReturnType<typeof adminFixture>>;
 beforeAll(async () => { f = await adminFixture(); });
@@ -81,6 +82,27 @@ describe('Audit trail', () => {
     const listed = await request(f.app).get('/api/v1/audit-logs?action=ALERT_ACCESS_DENIED&stationId=' + f.stationA.id).set('Cookie', admin.cookie);
     expect(listed.status).toBe(200);
     expect(listed.body.data.items.filter((row: { entityId: string }) => row.entityId === fixture.alertId)).toHaveLength(3);
+  });
+
+  it('records failed logins for known and unknown usernames without username, password or IP', async () => {
+    const since = new Date();
+    const unknownName = f.prefix + '.nobody';
+    const wrong = 'Wrong-login-passphrase-2026!';
+    const known = await request(f.app).post('/api/v1/auth/login').send({ username: f.securityA.username, password: wrong });
+    const unknown = await request(f.app).post('/api/v1/auth/login').send({ username: unknownName, password: wrong });
+    expectError(known, 401, 'INVALID_CREDENTIALS');
+    expectError(unknown, 401, 'INVALID_CREDENTIALS');
+    expect(unknown.body).toEqual(known.body);
+
+    const rows = await f.db.auditLog.findMany({ where: { action: 'AUTH_LOGIN_FAILED', createdAt: { gte: since } } });
+    const forKnown = rows.filter(row => row.entityId === f.securityA.id);
+    const forUnknown = rows.filter(row => row.entityId === null);
+    expect(forKnown).toHaveLength(1);
+    expect(forKnown[0]).toMatchObject({ actorAdminUserId: null, entityType: 'admin_user', stationId: f.stationA.id, details: null });
+    expect(forUnknown).toHaveLength(1);
+    expect(forUnknown[0]).toMatchObject({ actorAdminUserId: null, entityType: 'admin_user', stationId: null, details: null });
+    const text = JSON.stringify(rows);
+    for (const secret of [wrong, unknownName, f.securityA.username, '127.0.0.1', '::ffff:']) expect(text).not.toContain(secret);
   });
 
   it('never stores passwords, tokens, keys or passenger data in audit rows', async () => {
