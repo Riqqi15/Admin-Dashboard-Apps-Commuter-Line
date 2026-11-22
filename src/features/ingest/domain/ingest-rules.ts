@@ -10,7 +10,7 @@ export type EventInput = Readonly<{
   eventId: string; externalSessionId: string; type: CameraEventType; errorCode?: string | undefined; occurredAt: Date;
 }>;
 
-export const FRESHNESS_WINDOW_MS = 5 * 60_000;
+const FRESHNESS_WINDOW_MS = 5 * 60_000;
 
 // Replay protection: client timestamps must be close to server time, in both directions.
 export function assertFresh(value: Date, now: Date) {

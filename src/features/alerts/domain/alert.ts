@@ -16,7 +16,7 @@ export type Alert = PublicAlert & Readonly<{
   userNameCiphertext: string | null; userPhoneCiphertext: string | null; piiPurgedAt: Date | null;
 }>;
 
-export const PII_VISIBLE_DAYS = 7;
+const PII_VISIBLE_DAYS = 7;
 
 export const piiVisible = (alert: Alert, now = new Date()) =>
   !alert.piiPurgedAt && alert.createdAt.getTime() + PII_VISIBLE_DAYS * DAY_MS > now.getTime() && Boolean(alert.userNameCiphertext);
