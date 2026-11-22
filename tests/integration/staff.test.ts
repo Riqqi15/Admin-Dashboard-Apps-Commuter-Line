@@ -33,7 +33,7 @@ describe('Super Admin station and staff management', () => {
     const body = { username: '  ' + f.prefix.toUpperCase() + '.new  ', password: fixturePassword, stationId: f.stationA.id };
     const created = await request(f.app).post('/api/v1/staff').set('Cookie', admin.cookie).set('X-CSRF-Token', admin.csrf).send(body);
     expect(created.status).toBe(201);
-    expect(created.body.data).toMatchObject({ username: f.prefix + '.new', role: 'STATION_SECURITY', stationId: f.stationA.id, mustChangePassword: true });
+    expect(created.body.data).toMatchObject({ username: f.prefix + '.new', role: 'STATION_SECURITY', stationId: f.stationA.id, mustChangePassword: true, lastLoginAt: null });
     expect(created.text).not.toMatch(/passwordHash|tokenHash|csrfTokenHash/);
     const stored = await f.db.adminUser.findUniqueOrThrow({ where: { id: created.body.data.id } });
     expect(await verify(stored.passwordHash, fixturePassword)).toBe(true);
@@ -45,6 +45,9 @@ describe('Super Admin station and staff management', () => {
     const staff = await request(f.app).get('/api/v1/staff').set('Cookie', admin.cookie);
     expect(staff.status).toBe(200);
     expect(staff.body.data.items.every((user: { role: string }) => user.role === 'STATION_SECURITY')).toBe(true);
+    const scoped = await request(f.app).get('/api/v1/staff?pageSize=100&stationId=' + f.stationA.id).set('Cookie', admin.cookie);
+    const listed = scoped.body.data.items.find((user: { id: string }) => user.id === created.body.data.id);
+    expect(Date.parse(listed.lastLoginAt)).toBeGreaterThan(Date.parse(created.body.data.createdAt) - 1);
     expect(staff.text).not.toMatch(/passwordHash|tokenHash|csrfTokenHash/);
   });
 

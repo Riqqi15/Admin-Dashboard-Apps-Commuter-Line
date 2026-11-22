@@ -2,7 +2,7 @@ import type { Role } from '../../../shared/domain/roles';
 
 export type StaffAccount = Readonly<{
   id: string; username: string; role: Role; stationId: string | null;
-  isActive: boolean; mustChangePassword: boolean; createdAt: Date;
+  isActive: boolean; mustChangePassword: boolean; createdAt: Date; lastLoginAt: Date | null;
 }>;
 
 export type NewStaff = Readonly<{ username: string; stationId: string; passwordHash: string }>;

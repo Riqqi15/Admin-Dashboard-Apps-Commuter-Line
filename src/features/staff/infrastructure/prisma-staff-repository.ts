@@ -2,7 +2,7 @@ import { lockStationShared, lockUser } from '../../../shared/infrastructure/lock
 import type { Tx } from '../../../shared/infrastructure/prisma-unit-of-work';
 import type { StaffRepository } from '../application/staff-repository';
 
-const staffSelect = { id: true, username: true, role: true, stationId: true, isActive: true, mustChangePassword: true, createdAt: true } as const;
+const staffSelect = { id: true, username: true, role: true, stationId: true, isActive: true, mustChangePassword: true, createdAt: true, lastLoginAt: true } as const;
 
 export const prismaStaffRepository = (db: Tx): StaffRepository => ({
   async list({ stationId }, { page, pageSize }) {
