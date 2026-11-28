@@ -6,6 +6,10 @@ Tahap saat ini: fondasi Express/TypeScript, PostgreSQL + Prisma, auth username/s
 
 Collection Postman dan Environment lokal tersedia, termasuk request analytics, audit, dan SSE. Dokumen OpenAPI 3.1 tersedia di `GET /api/v1/openapi.json` (hanya di luar production). Workflow otomatis `npm run postman:camera` menjalankan 22 request nyata untuk alur kamera gagal sampai bantuan selesai. Lihat [panduan Postman](postman/README.md) dan [catatan progres](docs/progress.md).
 
+## Pratinjau tema web PGR-12
+
+Buka [`web/theme-preview.html`](web/theme-preview.html) dari folder lokal langsung di browser. Pratinjau ini menampilkan palet dan komponen dasar yang mengikuti tema aplikasi Commuter. Filter stasiun dan chip status memakai data contoh untuk memperlihatkan bentuk komponen sebelum halaman dashboard dihubungkan ke API.
+
 ## Menjalankan lokal
 
 Gunakan Node.js 24. Dari folder repository:

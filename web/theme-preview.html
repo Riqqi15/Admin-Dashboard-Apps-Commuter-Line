@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pratinjau tema Dashboard Commuter</title>
+    <link rel="stylesheet" href="commuter-theme.css">
+    <link rel="stylesheet" href="theme-preview.css">
+  </head>
+  <body>
+    <main class="preview">
+      <header class="preview-header">
+        <h1>Tema Dashboard Commuter</h1>
+        <p>Pratinjau komponen PGR-12 dengan data contoh.</p>
+        <a class="commuter-button" href="#status-alert">Lihat status alert</a>
+      </header>
+
+      <div class="preview-grid">
+        <section class="commuter-card preview-card">
+          <h2>Filter stasiun</h2>
+          <label for="station">Stasiun</label>
+          <select class="commuter-input" id="station">
+            <option>Semua stasiun</option>
+            <option>Manggarai</option>
+            <option>Tanah Abang</option>
+          </select>
+        </section>
+
+        <section class="commuter-card preview-card" id="status-alert" tabindex="-1">
+          <h2>Status alert</h2>
+          <ul class="preview-statuses">
+            <li><span class="commuter-chip" data-status="new">Baru</span></li>
+            <li><span class="commuter-chip" data-status="acknowledged">Ditangani</span></li>
+            <li><span class="commuter-chip" data-status="resolved">Selesai</span></li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
